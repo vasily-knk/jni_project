@@ -9,6 +9,15 @@ struct bar
 {
 	int i;
 	string str;
+
+    template<typename Proc>
+    friend void reflect(Proc &proc, bar const &const_val)
+    {
+        auto &val = const_cast<bar &>(const_val);
+
+        proc(val.i);
+        proc(val.str);
+    }
 };
 
 JVM_INTEROP_DECLARE_STRUCT_TYPE(bar, "Bar")

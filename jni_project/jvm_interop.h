@@ -11,6 +11,9 @@ struct jobject_wrapper
         : p_(p)
     {}
 
+    jobject_wrapper(jobject_wrapper const &) = delete;
+    jobject_wrapper &operator=(jobject_wrapper const &) = delete;
+
     ~jobject_wrapper()
     {
         if (p_)
