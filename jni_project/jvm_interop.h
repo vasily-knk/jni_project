@@ -134,11 +134,44 @@ runtime_type_desc_ptr get_runtime_type_desc()
 template<typename T>
 using jvm_type_t = typename jvm_type_traits<T>::jvm_type;
 
+template<typename T, typename... Args>
+T call_method(jobject_ptr obj, jmethodID method, Args&&... args);
+
+namespace detail
+{
+    struct cpp2jvm_processor_t
+    {
+        explicit cpp2jvm_processor_t(struct_runtime_type_desc_ptr desc, jobject_ptr dst)
+            : desc_(desc)
+            , dst_(dst)
+        {}
+
+        template<typename T>
+        void operator()(T const &field_src, char const *name) 
+        {
+            auto field_dst = cpp2jvm(field_src);
+
+            auto field_desc = jvm_type_traits<T>::get_runtime_desc();
+            jmethodID setter = desc_->setter(name, field_desc);
+
+            call_method<void>(dst_, setter, field_dst);
+        }
+
+    private:
+        struct_runtime_type_desc_ptr desc_;
+        jobject_ptr dst_;
+    };
+
+} // namespace detail
+
 template<typename T>
 T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
 {
 	return src;
 }
+
+jstring cpp2jvm(string const &src);
+
 
 template<typename T>
 jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
@@ -148,10 +181,13 @@ jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primi
 	struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
     jobject_ptr obj = runtime_desc->create();
 
+    detail::cpp2jvm_processor_t proc(runtime_desc, obj);
+    reflect(proc, src);
+
 	return obj;
 }
 
-//jstring cpp2jvm(string const &src);
+
 
 namespace detail
 {
