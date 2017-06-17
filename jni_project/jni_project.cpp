@@ -110,11 +110,11 @@ int main(int argc, char **argv)
         typedef string ret_type;
         typedef jvm_type_traits<ret_type>::jvm_type jvm_ret_type;
 
-		auto getter = desc->getter("secret_string", get_runtime_type_desc<ret_type>());
+		auto getter = desc->getter("secretString", get_runtime_type_desc<ret_type>());
 
 		auto f = call_method<jvm_ret_type>(jb, getter);
 
-		std::cout << "Secret value: " << jvm2cpp<ret_type>(f) << std::endl;
+		std::cout << "SecretValue: " << jvm2cpp<ret_type>(f) << std::endl;
 	} 
 	catch (jvm_interop_error const &e)
 	{

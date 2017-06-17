@@ -20,7 +20,7 @@ struct jobject_wrapper
             free_local_ref(p_);
     }
 
-    jobject get_p() const
+    jobject get_p() const                                                      
     {
         return p_;
     }

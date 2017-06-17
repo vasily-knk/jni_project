@@ -4,6 +4,33 @@
 
 namespace jvm_interop
 {
+    namespace
+    {
+        string fix_field_name(char const *name)
+        {
+            string result = name;
+
+            if (!result.empty())
+            {
+                char &c = result.at(0);
+                if (c >= 'a' && c <= 'z')
+                    c += 'A' - 'a';
+            }
+            
+            return result;
+        }
+
+        string make_getter_name(char const *name)
+        {
+            return "get" + fix_field_name(name);
+        }
+
+        string make_setter_name(char const *name)
+        {
+            return "set" + fix_field_name(name);
+        }
+
+    } // namespace
 
 	struct struct_runtime_type_desc_impl
 		: struct_runtime_type_desc
@@ -64,20 +91,16 @@ namespace jvm_interop
 
 		jmethodID getter(char const* field_name, runtime_type_desc_ptr runtime_type_desc) override
 		{
-			string method_name = string("get_") + field_name;
-
 			auto sig = make_method_signature(runtime_type_desc, {  });
 
-			return find_method(method_name, sig);
+			return find_method(make_getter_name(field_name), sig);
 		}
 
 		jmethodID setter(char const* field_name, runtime_type_desc_ptr runtime_type_desc) override
 		{
-			string method_name = string("set_") + field_name;
-
 			auto sig = make_method_signature(get_runtime_type_desc<void>(), { runtime_type_desc });
 
-			return find_method(method_name, sig);
+			return find_method(make_setter_name(field_name), sig);
 		}
 
 	private:
