@@ -2,6 +2,34 @@
 
 namespace jvm_interop
 {
+
+void free_local_ref(jobject p);
+
+struct jobject_wrapper
+{
+    explicit jobject_wrapper(jobject p)
+        : p_(p)
+    {}
+
+    ~jobject_wrapper()
+    {
+        if (p_)
+            free_local_ref(p_);
+    }
+
+    jobject get_p() const
+    {
+        return p_;
+    }
+
+private:
+    jobject p_;
+}; 
+
+struct jobject_wrapper;
+typedef shared_ptr<jobject_wrapper> jobject_ptr;
+jobject_ptr wrap(jobject p);
+    
 struct runtime_type_desc	   ;
 struct struct_runtime_type_desc;
 
@@ -21,7 +49,7 @@ struct struct_runtime_type_desc
 	: runtime_type_desc
 {
 	virtual string const &lookup_name() = 0;
-	virtual jobject create() = 0;
+	virtual jobject_ptr create() = 0;
 	virtual jclass get_class() = 0;
 
 	virtual jmethodID getter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
@@ -46,7 +74,7 @@ struct jvm_primitive_type_traits
 template<typename T>
 struct jvm_struct_type_traits
 {
-	typedef jobject jvm_type;
+	typedef jobject_ptr jvm_type;
 	static const bool is_primitive = false;
 };
 
@@ -110,17 +138,17 @@ T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
 }
 
 template<typename T>
-jobject cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
+jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
 {
 	typedef jvm_type_traits<T> traits;
 
 	struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
-	jobject obj = runtime_desc->create();
+    jobject_ptr obj = runtime_desc->create();
 
 	return obj;
 }
 
-jstring cpp2jvm(string const &src);
+//jstring cpp2jvm(string const &src);
 
 namespace detail
 {
@@ -139,7 +167,7 @@ namespace detail
 	template <typename T>
 	struct jvm2cpp_t<T, std::enable_if_t<!jvm_type_traits<T>::is_primitive>>
 	{
-		static T process(jobject src)
+		static T process(jobject_ptr src)
 		{
 			return T();
 		}
@@ -148,7 +176,7 @@ namespace detail
 	template<>
 	struct jvm2cpp_t<string>
 	{
-		static string process(jobject src);
+		static string process(jobject_ptr src);
 	};
 } // namespace detail
 
@@ -200,13 +228,35 @@ namespace detail
 	struct method_caller<type>									     						   \
 	{																						   \
 		template<typename... Args>															   \
-		static type call(jobject obj, jmethodID method, Args&&... args)			    		   \
+		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    		   \
 		{																					   \
-			type result = env_instance()->Call ## Type ## Method(obj, method, std::forward<Args>(args)...);  \
+			type result = env_instance()->Call ## Type ## Method(obj->get_p(), method, std::forward<Args>(args)...);  \
             process_jvm_exceptions(); \
             return result; \
 		}																					   \
 	};
+
+    template<>
+    struct method_caller<void>
+    {
+        template<typename... Args>
+        static void call(jobject_ptr obj, jmethodID method, Args&&... args)
+        {
+            env_instance()->CallVoidMethod(obj->get_p(), method, std::forward<Args>(args)...);
+            process_jvm_exceptions();
+        }
+    };
+    
+    template<> struct method_caller<jobject_ptr>
+    {
+        template<typename... Args>
+        static jobject_ptr call(jobject_ptr obj, jmethodID method, Args&&... args)
+        {
+            jobject_ptr result = wrap(env_instance()->CallObjectMethod(obj->get_p(), method, std::forward<Args>(args)...)); 
+            process_jvm_exceptions(); 
+            return result;
+        }
+    };
 
 JVM_INTEROP_DEFINE_METHOD_CALLER(jboolean, Boolean)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jbyte   , Byte)
@@ -216,8 +266,6 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jfloat  , Float)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jint    , Int)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jlong   , Long)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jshort  , Short)
-JVM_INTEROP_DEFINE_METHOD_CALLER(void    , Void)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jobject , Object)
 
 #undef JVM_INTEROP_DEFINE_METHOD_CALLER
 
@@ -226,7 +274,7 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jobject , Object)
 
 
 template<typename T, typename... Args>
-T call_method(jobject obj, jmethodID method, Args&&... args)
+T call_method(jobject_ptr obj, jmethodID method, Args&&... args)
 {
 	return detail::method_caller<T>::call(obj, method, std::forward<Args>(args)...);
 }

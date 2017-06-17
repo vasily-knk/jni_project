@@ -36,13 +36,13 @@ namespace jvm_interop
 			return lookup_name_;
 		}
 
-		jobject create() override
+        jobject_ptr create() override
 		{
 			JNIEnv* env = env_instance();
 			jclass clazz = get_jclass();
 			jmethodID ctor = find_method("<init>", "()V");
 
-			jobject obj = env->NewObject(clazz, ctor);
+            jobject_ptr obj = wrap(env->NewObject(clazz, ctor));
 
 			process_jvm_exceptions();
 

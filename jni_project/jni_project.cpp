@@ -86,10 +86,11 @@ int main(int argc, char **argv)
 		env->ExceptionClear();
 	}
 
-	bar b;
-	jobject jb = nullptr;
+    using namespace jvm_interop;
 
-	using namespace jvm_interop;
+    bar b;
+    jvm_interop::jobject_ptr jb;
+
 
 	try
 	{

@@ -61,6 +61,17 @@ namespace
 } // namespace
 
 
+void free_local_ref(jobject p)
+{
+    env_instance()->DeleteLocalRef(p);
+}
+
+jobject_ptr wrap(jobject p)
+{
+    return make_shared<jobject_wrapper>(p);
+}
+
+
 
 JNIEnv *env_instance()
 {
@@ -88,9 +99,17 @@ jstring cpp2jvm(string const &src)
 namespace detail
 {
 	
-	string jvm2cpp_t<string>::process(jobject src)
+	string jvm2cpp_t<string>::process(jobject_ptr src)
 	{
-		return env_instance()->GetStringUTFChars(static_cast<jstring>(src), nullptr);
+	    auto env = env_instance();
+
+	    auto src_str = static_cast<jstring>(src->get_p());
+
+	    char const *p = env->GetStringUTFChars(src_str, nullptr);
+	    string str(p);
+
+        env->ReleaseStringUTFChars(src_str, p);
+        return str;
 	}
 
 } // namespace detail
@@ -102,19 +121,19 @@ void process_jvm_exceptions()
 
     if (env->ExceptionCheck())
     {
-        jthrowable e = env->ExceptionOccurred();
+        auto e = wrap(env->ExceptionOccurred());
+        
         env->ExceptionClear(); 
 
-        jclass clazz = env->GetObjectClass(e);
+        jclass clazz = env->GetObjectClass(e->get_p());
         jmethodID getMessage = env->GetMethodID(clazz, "getMessage", "()Ljava/lang/String;");
-
-        jstring message = static_cast<jstring>(env->CallObjectMethod(e, getMessage));
-        const char *mstr = env->GetStringUTFChars(message, nullptr);
+        
+        auto str = jvm2cpp<string>(call_method<jobject_ptr>(e, getMessage));
 
         env->ExceptionClear();
 
         std::stringstream ss;
-        ss << "JVM Exception: " << mstr;
+        ss << "JVM Exception: " << str;
         throw jvm_interop_error(ss.str());
     }
 }

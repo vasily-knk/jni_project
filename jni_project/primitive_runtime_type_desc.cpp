@@ -30,6 +30,7 @@ private:
 	string signature_;
 };
 
+
 runtime_type_desc_ptr create_primitive_runtime_type_desc(char const *java_name, char sig)
 {
 	return make_shared<primitive_runtime_type_desc_impl>(java_name, sig);
