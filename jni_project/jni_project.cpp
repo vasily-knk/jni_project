@@ -81,16 +81,38 @@ int main(int argc, char **argv)
 
 
 
-	jmethodID methodId = env->GetStaticMethodID(jcls, "greet", "(Ljava/lang/String;)V");
+	jmethodID methodId = env->GetStaticMethodID(jcls, "greet", "([Ljava/lang/String;IF)V");
 	if (!methodId)
 	{
 		cerr << "method not found\n";
 		return 1;
 	}
+	auto string_class = env->FindClass("java/lang/String");
+	if (!string_class)
+	{
+		cerr << "string class not found\n";
+		return -1;
+	}
 
-	jstring str = env->NewStringUTF("aaa");
+	vector<string> strings = {
+		"aaa", "bbb", "ccc",
+	};
+
+	auto arr = env->NewObjectArray(strings.size(), string_class, nullptr);
+	if (!arr)
+	{
+		cerr << "Array creation failed\n";
+		return -1;
+	}
+	for (jsize i = 0; i < strings.size(); ++i)
+	{
+		env->SetObjectArrayElement(arr, i, env->NewStringUTF(strings.at(i).c_str()));
+	}
 	
-	env->CallStaticVoidMethod(jcls, methodId, str);
+	jint int_arg = 117;
+	jfloat float_arg = 3.14f;
+
+	env->CallStaticVoidMethod(jcls, methodId, arr, int_arg, float_arg);
 	
 	if (env->ExceptionCheck()) 
 	{
