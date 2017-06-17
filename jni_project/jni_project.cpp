@@ -3,61 +3,27 @@
 
 #include "stdafx.h"
 
-#include <jni.h>
-#include <iostream>
-#include <string>
-using namespace std;
+#include "jvm_interop.h"
 
-
-struct java_vm_t
+struct bar
 {
-	java_vm_t() = default;
-	
-	java_vm_t(java_vm_t const &) = delete;
-	java_vm_t &operator=(java_vm_t const &) = delete;
-	
-	~java_vm_t()
-	{
-		if (vm)
-		{
-			vm->DestroyJavaVM();
-			vm = nullptr;
-		}
-	}
-	
-	JavaVM *vm = nullptr;
+	int i;
+	string str;
 };
+
+JVM_INTEROP_DECLARE_STRUCT_TYPE(bar, "Bar")
+
 
 void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
 {
 	auto ptr = reinterpret_cast<uint8_t *>(&val);
-	cout << "FOOOING: " << val << "\n";
+	std::cout << "FOOOING: " << val << "\n";
 }
 
 int main(int argc, char **argv)
 {
 
-	JavaVMOption jvmopt[1];
-	jvmopt[0].optionString = "-Djava.class.path=../out";
-	jvmopt[0].extraInfo = nullptr;
-
-	JavaVMInitArgs vmArgs;
-	vmArgs.version = JNI_VERSION_1_8;
-	vmArgs.nOptions = 1;
-	vmArgs.options = jvmopt;
-	vmArgs.ignoreUnrecognized = JNI_TRUE;
-
-	java_vm_t java_vm;
-
-	// Create the JVM
-	JNIEnv *env;
-	long flag = JNI_CreateJavaVM(&java_vm.vm, reinterpret_cast<void**>(&env), &vmArgs);
-
-	if (flag == JNI_ERR) 
-	{
-		cout << "Error creating VM. Exiting...\n";
-		return 1;
-	}
+	JNIEnv *env = jvm_interop::env_instance();
 
 	jclass jcls = env->FindClass("org/jnijvm/Demo");
 	if (!jcls) 
@@ -84,13 +50,13 @@ int main(int argc, char **argv)
 	jmethodID methodId = env->GetStaticMethodID(jcls, "greet", "([Ljava/lang/String;IF)V");
 	if (!methodId)
 	{
-		cerr << "method not found\n";
+		std::cerr << "method not found\n";
 		return 1;
 	}
 	auto string_class = env->FindClass("java/lang/String");
 	if (!string_class)
 	{
-		cerr << "string class not found\n";
+		std::cerr << "string class not found\n";
 		return -1;
 	}
 
@@ -101,7 +67,7 @@ int main(int argc, char **argv)
 	auto arr = env->NewObjectArray(strings.size(), string_class, nullptr);
 	if (!arr)
 	{
-		cerr << "Array creation failed\n";
+		std::cerr << "Array creation failed\n";
 		return -1;
 	}
 	for (jsize i = 0; i < strings.size(); ++i)
@@ -119,6 +85,36 @@ int main(int argc, char **argv)
 		env->ExceptionDescribe();
 		env->ExceptionClear();
 	}
+
+	bar b;
+	jobject jb = nullptr;
+
+	using namespace jvm_interop;
+
+	try
+	{
+		jb = cpp2jvm(b);
+
+		auto desc = jvm_type_traits<bar>::get_runtime_desc();
+
+        typedef string ret_type;
+        typedef jvm_type_traits<ret_type>::jvm_type jvm_ret_type;
+
+		auto getter = desc->getter("secret_string", get_runtime_type_desc<ret_type>());
+
+		auto f = call_method<jvm_ret_type>(jb, getter);
+
+		std::cout << "Secret value: " << jvm2cpp<ret_type>(f) << std::endl;
+	} 
+	catch (jvm_interop_error const &e)
+	{
+		std::cerr << e.what() << std::endl;
+	}
+
+	jvm2cpp<jint>(5);
+
+    auto s = make_method_signature<void, jint>();
+
 
 	return 0;
 }

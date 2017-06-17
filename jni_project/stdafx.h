@@ -7,11 +7,23 @@
 
 #include "targetver.h"
 
-#include <stdio.h>
-#include <tchar.h>
+#include <jni.h>
+#include <iostream>
+
+#include <string>
+using std::string;
 
 
-
-// TODO: reference additional headers your program requires here
 #include <vector>
 using std::vector;
+
+#include <memory>
+using std::shared_ptr;
+using std::make_shared;
+
+#include <sstream>
+
+#include <type_traits>
+
+
+#include <boost/algorithm/string.hpp>
