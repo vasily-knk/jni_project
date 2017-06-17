@@ -162,6 +162,32 @@ namespace detail
         jobject_ptr dst_;
     };
 
+
+    struct jvm2cpp_processor_t
+    {
+        explicit jvm2cpp_processor_t(struct_runtime_type_desc_ptr desc, jobject_ptr src)
+            : desc_(desc)
+            , src_(src)
+        {}
+
+        template<typename T>
+        void operator()(T &field_dst, char const *name)
+        {
+            auto field_desc = jvm_type_traits<T>::get_runtime_desc();
+            jmethodID getter = desc_->getter(name, field_desc);
+
+            typedef typename jvm_type_traits<T>::jvm_type jvm_type;
+            
+            auto interm = call_method<jvm_type>(src_, getter);
+
+            field_dst = jvm2cpp<T>(interm);
+        }
+
+    private:
+        struct_runtime_type_desc_ptr desc_;
+        jobject_ptr src_;
+    };
+
 } // namespace detail
 
 template<typename T>
@@ -208,7 +234,15 @@ namespace detail
 	{
 		static T process(jobject_ptr src)
 		{
-			return T();
+            typedef jvm_type_traits<T> traits;
+
+            struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
+            T result;
+
+            detail::jvm2cpp_processor_t proc(runtime_desc, src);
+            reflect(proc, result);
+
+            return result;
 		}
 	};
 

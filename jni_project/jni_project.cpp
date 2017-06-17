@@ -101,10 +101,13 @@ int main(int argc, char **argv)
     b.i = 10002;
     b.str = "Heya!";
 
+    bar b2;
+
 
 	try
 	{
         jobject_ptr jb = cpp2jvm(b);
+        b2 = jvm2cpp<bar>(jb);
 	} 
 	catch (jvm_interop_error const &e)
 	{
