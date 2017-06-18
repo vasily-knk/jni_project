@@ -93,31 +93,21 @@ namespace jvm_interop
 		{
 			auto sig = make_method_signature(runtime_type_desc, {  });
 
-			return find_method(make_getter_name(field_name).c_str(), sig);
+			return find_method(make_getter_name(field_name), sig);
 		}
 
 		jmethodID setter(char const* field_name, runtime_type_desc_ptr runtime_type_desc) override
 		{
 			auto sig = make_method_signature(get_runtime_type_desc<void>(), { runtime_type_desc });
 
-			return find_method(make_setter_name(field_name).c_str(), sig);
+			return find_method(make_setter_name(field_name), sig);
 		}
 
-        jmethodID find_method(char const *name, string const &sig) override
+        jmethodID find_method(string const &method_name, string const &sig) override
         {
             jclass clazz = get_jclass();
 
-            JNIEnv* env = env_instance();
-            jmethodID id = env->GetMethodID(clazz, name, sig.c_str());
-
-            if (!id)
-            {
-                std::stringstream ss;
-                ss << "Method '" << name << "' with signature '" << sig << "' not found in '" << lookup_name_ << "'";
-                throw jvm_interop_error(ss.str());
-            }
-
-            return id;
+            return get_method(clazz, method_name.c_str(), sig.c_str());
         }
 
     private:
@@ -127,14 +117,7 @@ namespace jvm_interop
 			if (clazz_)
 				return clazz_;
 
-			clazz_ = env_instance()->FindClass(lookup_name_.c_str());
-
-			if (!clazz_)
-			{
-				std::stringstream ss;
-				ss << "JVM class not found: '" << lookup_name_ << "'";
-				throw jvm_interop_error(ss.str());
-			}
+            clazz_ = find_class(lookup_name_.c_str());
 
 			return clazz_;
 		}

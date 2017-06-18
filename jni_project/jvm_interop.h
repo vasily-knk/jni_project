@@ -72,7 +72,7 @@ struct struct_runtime_type_desc
 	virtual jmethodID getter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
 	virtual jmethodID setter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
 
-    virtual jmethodID find_method(char const *field_name, string const &sig) = 0;
+    virtual jmethodID find_method(string const &method_name, string const &sig) = 0;
 };
 
 
@@ -121,19 +121,6 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
     return val;
 }
 
-#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig) \
-	template<> \
-	struct jvm_interop::jvm_type_traits<cpp_type> \
-		: jvm_interop::jvm_primitive_type_traits<cpp_type> \
-	{ \
-		static jvm_interop::runtime_type_desc_ptr get_runtime_desc() \
-		{ \
-			static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
-			return p; \
-		} \
-	};
-
-
 #define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name) \
 	template<> \
 	struct jvm_interop::jvm_type_traits<cpp_type> \
@@ -145,6 +132,21 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 			return p; \
 		} \
 	}; 
+
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
+	template<> \
+	struct jvm_interop::jvm_type_traits<cpp_type> \
+		: jvm_interop::jvm_primitive_type_traits<cpp_type> \
+	{ \
+		static jvm_interop::runtime_type_desc_ptr get_runtime_desc() \
+		{ \
+			static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
+			return p; \
+		} \
+	}; \
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<cpp_type>, boxed_name) 
+
+
 
     
 #define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name) \
@@ -158,19 +160,17 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 
 
 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jboolean, "boolean", 'Z') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jbyte   , "byte"   , 'B') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jchar   , "char"   , 'C') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jdouble , "double" , 'D') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jfloat  , "float"  , 'F') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jint    , "int"    , 'I') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jlong   , "long"   , 'J') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jshort  , "short"  , 'S') 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V') 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jboolean, "boolean", 'Z', "java.lang.Boolean") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jbyte   , "byte"   , 'B', "java.lang.Byte") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jchar   , "char"   , 'C', "java.lang.Char") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jdouble , "double" , 'D', "java.lang.Double") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jfloat  , "float"  , 'F', "java.lang.Float") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jint    , "int"    , 'I', "java.lang.Int") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jlong   , "long"   , 'J', "java.lang.Long") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jshort  , "short"  , 'S', "java.lang.Short") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V', "java.lang.Void") 
 
 JVM_INTEROP_DECLARE_STRUCT_TYPE(string, "java.lang.String")
-
-JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<float>, "java.lang.Float")
 
 template<typename T>
 runtime_type_desc_ptr get_runtime_type_desc()
@@ -191,19 +191,6 @@ string make_method_signature(runtime_type_desc_ptr ret, vector<runtime_type_desc
 template<typename Ret, typename... Args>
 string make_method_signature();
 void process_jvm_exceptions();
-
-
-struct exceptions_handler
-{
-    exceptions_handler() = default;
-    ~exceptions_handler()
-    {
-        process_jvm_exceptions();
-    }
-
-    exceptions_handler(exceptions_handler const &) = delete;
-    exceptions_handler &operator=(exceptions_handler const &) = delete;
-};
 
 
 
@@ -352,7 +339,10 @@ namespace detail
         struct_runtime_type_desc_ptr runtime_desc = jvm_type_traits<optional<T>>::get_runtime_desc();
 
         auto sig = make_method_signature<T>();
-        auto m = runtime_desc->find_method("getValue", sig);
+
+        string name = jvm_type_traits<T>::get_runtime_desc()->java_name() + "Value";
+
+        auto m = runtime_desc->find_method(name.c_str(), sig);
 
         dst = call_method<T>(src, m);
     }
@@ -407,8 +397,8 @@ namespace detail
 		template<typename... Args>															   \
 		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   \
 		{																					   \
-			exceptions_handler h;                                                              \
             return wrap(env_instance()->Call ## Type ## Method(obj->get_p(), method, unwrap(args)...)); \
+            process_jvm_exceptions(); \
 		}																					   \
 	};
 
@@ -418,9 +408,16 @@ struct method_caller<void>
     template<typename... Args>															   
     static void call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   
     {																					   
-        exceptions_handler h;                                                              
         env_instance()->CallVoidMethod(obj->get_p(), method, unwrap(args)...); 
-    }																					   
+        process_jvm_exceptions();
+    }
+    
+    template<typename... Args>
+    static void call_static(jclass clazz, jmethodID method, Args&&... args)
+    {
+        env_instance()->CallStaticVoidMethod(clazz, method, unwrap(cpp2jvm(args))...);
+        process_jvm_exceptions();
+    }
 };
 
 
@@ -445,5 +442,87 @@ T call_method(jobject_ptr obj, jmethodID method, Args&&... args)
 {
 	return detail::method_caller<T>::call(obj, method, std::forward<Args>(args)...);
 }
+
+jclass find_class(char const *name);
+
+void register_native_impl(jclass clazz, char const *name, char const *sig, void *fn_ptr);
+    
+template<typename T, typename... Args>
+void register_native(jclass clazz, char const *name, void *fn_ptr)
+{
+    string sig = make_method_signature<T, Args...>();
+    register_native_impl(clazz, name, sig.c_str(), fn_ptr);
+}
+
+
+template<typename Ret, typename... Args>
+struct method_t
+{
+    struct caller
+    {
+        caller(const jobject_ptr& jobject_wrapper, jmethodID id)
+            : obj(jobject_wrapper)
+            , id(id)
+        {}
+
+        Ret operator()(Args&&...args) const
+        {
+            return detail::method_caller<Ret>::call(obj, id, std::forward<Args>(args)...);
+        }
+
+        jobject_ptr obj;
+        jmethodID id;
+    };
+
+    explicit method_t(jmethodID id)
+        : id(id)
+    {}
+    
+    caller operator()(jobject_ptr obj) const
+    {
+        return caller(obj, id);
+    }
+
+private:
+    jmethodID id;
+};
+
+template<typename Ret, typename... Args>
+struct static_method_t
+{
+    explicit static_method_t(jclass clazz, jmethodID id)
+        : clazz(clazz)
+        , id(id)
+    {}
+
+    Ret operator()(Args&&...args) const
+    {
+        return detail::method_caller<Ret>::call_static(clazz, id, std::forward<Args>(args)...);
+    }
+
+private:
+    jclass clazz;
+    jmethodID id;
+};
+
+jmethodID get_method(jclass clazz, char const *name, char const *sig);
+jmethodID get_static_method(jclass clazz, char const *method_name, char const *sig);
+
+template<typename Ret, typename... Args>
+method_t<Ret, Args...> get_method(jclass clazz, char const *name)
+{
+    const string sig = make_method_signature<Ret, Args...>();
+    const jmethodID id = get_method(clazz, name, sig.c_str());
+    return method_t<Ret, Args...>(id);
+}
+
+template<typename Ret, typename... Args>
+static_method_t<Ret, Args...> get_static_method(jclass clazz, char const *name)
+{
+    const string sig = make_method_signature<Ret, Args...>();
+    const jmethodID id = get_static_method(clazz, name, sig.c_str());
+    return static_method_t<Ret, Args...>(clazz, id);
+}
+
 
 } // namespace jvm_interop

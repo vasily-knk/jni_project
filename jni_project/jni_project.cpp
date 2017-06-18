@@ -5,11 +5,27 @@
 
 #include "jvm_interop.h"
 
+struct baz
+{
+    jint hhh;
+
+    template<typename Proc>
+    friend void reflect(Proc &proc, baz const &const_val)
+    {
+        auto &val = const_cast<baz &>(const_val);
+        proc(val.hhh, "hhh");
+    }
+};
+
 struct bar
 {
 	jint i;
 	string str;
     optional<float> of;
+    optional<string> ostr;
+
+    baz bz;
+    optional<baz> obz;
 
     template<typename Proc>
     friend void reflect(Proc &proc, bar const &const_val)
@@ -19,16 +35,30 @@ struct bar
         proc(val.i, "i");
         proc(val.str, "str");
         proc(val.of, "of");
+        proc(val.ostr, "ostr");
+        proc(val.bz, "bz");
+        proc(val.obz, "obz");
     }
 };
 
 JVM_INTEROP_DECLARE_STRUCT_TYPE(bar, "Bar")
+JVM_INTEROP_DECLARE_STRUCT_TYPE(baz, "Baz")
 
 
 void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
 {
 	auto ptr = reinterpret_cast<uint8_t *>(&val);
 	std::cout << "FOOOING: " << val << "\n";
+}
+
+
+void JNICALL onBaz_c(JNIEnv *env, jobject self_raw, jobject b_raw)
+{
+    using namespace jvm_interop;
+
+    auto b = jvm2cpp<baz>(wrap(b_raw));
+
+    int aaa = 5;
 }
 
 int main(int argc, char **argv)
@@ -103,14 +133,34 @@ int main(int argc, char **argv)
     b.i = 10002;
     b.str = "Heya!";
     b.of = 3.14f;
+    b.ostr = "HAAA";
+
+    b.bz.hhh = 117;
+    b.obz = baz();
 
     bar b2;
 
 
 	try
 	{
+        auto bar_jclass = jvm_type_traits<bar>::get_runtime_desc()->get_class();
+
+        register_native<void, baz>(bar_jclass, "onBz", onBaz_c);
+
         jobject_ptr jb = cpp2jvm(b);
+
+        auto m = get_method<void, double>(bar_jclass, "doSomething");
+
+        m(jb)(256.4);
+
         b2 = jvm2cpp<bar>(jb);
+
+
+        jclass demo_jclass = find_class("org/jnijvm/Demo");
+        auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");
+
+        sm("Vasya", 32, 116.99);
+
 	} 
 	catch (jvm_interop_error const &e)
 	{
@@ -118,5 +168,6 @@ int main(int argc, char **argv)
 	}
 
 
-	return 0;
+                                 
+    return 0;
 }

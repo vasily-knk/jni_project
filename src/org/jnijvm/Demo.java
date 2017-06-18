@@ -1,13 +1,9 @@
 package org.jnijvm;
 
 public class Demo {
-    public static void greet(String[] names, int int_arg, float float_arg) {
-        foo(73);
+    public static void greet(String name, int int_arg, float float_arg) {
         System.out.print("Hi: " );
-
-        for (String name : names)
-            System.out.print(name + " ");
-
+        System.out.print(name);
         System.out.println();
 
         System.out.println("Int: " + int_arg);

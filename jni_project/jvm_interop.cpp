@@ -145,7 +145,7 @@ void process_jvm_exceptions()
         jclass clazz = env->GetObjectClass(e->get_p());
         jmethodID getMessage = env->GetMethodID(clazz, "getMessage", "()Ljava/lang/String;");
         
-        auto str = jvm2cpp<string>(call_method<jobject_ptr>(e, getMessage));
+        auto str = string();// jvm2cpp<string>(call_method<jobject_ptr>(e, getMessage));
 
         env->ExceptionClear();
 
@@ -154,6 +154,68 @@ void process_jvm_exceptions()
         throw jvm_interop_error(ss.str());
     }
 }
+
+jclass find_class(char const *name)
+{
+    JNIEnv* env = env_instance();
+
+    jclass jcls = env->FindClass(name);
+
+    if (!jcls)
+    {
+        std::stringstream ss;
+        ss << "JVM class not found: " << name;
+        throw jvm_interop_error(ss.str());
+    }
+
+    return jcls;
+
+}
+
+void register_native_impl(jclass clazz, char const *name, char const *sig, void *fn_ptr)
+{
+    JNIEnv* env = env_instance();
+
+    JNINativeMethod m = { const_cast<char*>(name), const_cast<char*>(sig), fn_ptr };
+
+    auto ret = env->RegisterNatives(clazz, &m, 1);
+    if (ret != JNI_OK)
+        process_jvm_exceptions();
+}
+
+jmethodID get_method(jclass clazz, char const *method_name, char const *sig)
+{
+    JNIEnv* env = env_instance();
+    jmethodID id = env->GetMethodID(clazz, method_name, sig);
+
+    if (!id)
+    {
+        std::stringstream ss;
+        ss << "Method '" << method_name << "' with signature '" << sig << "' not found";
+        throw jvm_interop_error(ss.str());
+    }
+
+    return id;
+
+}
+
+jmethodID get_static_method(jclass clazz, char const *method_name, char const *sig)
+{
+    JNIEnv* env = env_instance();
+    jmethodID id = env->GetStaticMethodID(clazz, method_name, sig);
+
+    if (!id)
+    {
+        std::stringstream ss;
+        ss << "Static method '" << method_name << "' with signature '" << sig << "' not found";
+        throw jvm_interop_error(ss.str());
+    }
+
+    return id;
+
+}
+
+
 
     
 } // namespace jvm_interop
