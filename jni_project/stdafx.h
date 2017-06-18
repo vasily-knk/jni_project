@@ -27,3 +27,6 @@ using std::make_shared;
 
 
 #include <boost/algorithm/string.hpp>
+
+#include <boost/optional.hpp>
+using boost::optional;

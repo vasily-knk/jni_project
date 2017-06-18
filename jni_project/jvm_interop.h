@@ -3,6 +3,20 @@
 namespace jvm_interop
 {
 
+    struct jvm_interop_error
+        : std::runtime_error
+    {
+        explicit jvm_interop_error(const string& _Message)
+            : runtime_error(_Message)
+        {
+        }
+
+        explicit jvm_interop_error(const char* _Message)
+            : runtime_error(_Message)
+        {
+        }
+    };
+
 void free_local_ref(jobject p);
 
 struct jobject_wrapper
@@ -31,8 +45,8 @@ private:
 
 struct jobject_wrapper;
 typedef shared_ptr<jobject_wrapper> jobject_ptr;
-jobject_ptr wrap(jobject p);
-    
+
+
 struct runtime_type_desc	   ;
 struct struct_runtime_type_desc;
 
@@ -57,6 +71,8 @@ struct struct_runtime_type_desc
 
 	virtual jmethodID getter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
 	virtual jmethodID setter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
+
+    virtual jmethodID find_method(char const *field_name, string const &sig) = 0;
 };
 
 
@@ -81,6 +97,29 @@ struct jvm_struct_type_traits
 	static const bool is_primitive = false;
 };
 
+template<typename T>
+using enable_if_primitive_t = std::enable_if_t<jvm_type_traits<T>::is_primitive>;
+
+template<typename T>
+using enable_if_not_primitive_t = std::enable_if_t<!jvm_type_traits<T>::is_primitive>;
+
+
+jobject_ptr wrap(jobject p);
+jobject_ptr wrap_null();
+
+template<typename T>
+T wrap(T val, enable_if_primitive_t<T> * = nullptr)
+{
+    return val;
+}
+
+jobject unwrap(jobject_ptr p);
+
+template<typename T>
+T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
+{
+    return val;
+}
 
 #define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig) \
 	template<> \
@@ -94,7 +133,8 @@ struct jvm_struct_type_traits
 		} \
 	};
 
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name) \
+
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name) \
 	template<> \
 	struct jvm_interop::jvm_type_traits<cpp_type> \
 		: jvm_interop::jvm_struct_type_traits<cpp_type> \
@@ -104,7 +144,14 @@ struct jvm_struct_type_traits
 			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
 			return p; \
 		} \
-	};
+	}; 
+
+    
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name) \
+	template<> \
+	struct jvm_interop::jvm_type_traits<optional<cpp_type>> \
+        : jvm_interop::jvm_type_traits<cpp_type> {};
 
 
 
@@ -123,6 +170,8 @@ JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V')
 
 JVM_INTEROP_DECLARE_STRUCT_TYPE(string, "java.lang.String")
 
+JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<float>, "java.lang.Float")
+
 template<typename T>
 runtime_type_desc_ptr get_runtime_type_desc()
 {
@@ -136,6 +185,30 @@ using jvm_type_t = typename jvm_type_traits<T>::jvm_type;
 
 template<typename T, typename... Args>
 T call_method(jobject_ptr obj, jmethodID method, Args&&... args);
+
+string make_method_signature(runtime_type_desc_ptr ret, vector<runtime_type_desc_ptr> args);
+
+template<typename Ret, typename... Args>
+string make_method_signature();
+void process_jvm_exceptions();
+
+
+struct exceptions_handler
+{
+    exceptions_handler() = default;
+    ~exceptions_handler()
+    {
+        process_jvm_exceptions();
+    }
+
+    exceptions_handler(exceptions_handler const &) = delete;
+    exceptions_handler &operator=(exceptions_handler const &) = delete;
+};
+
+
+
+JNIEnv *env_instance();
+
 
 namespace detail
 {
@@ -196,9 +269,6 @@ T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
 	return src;
 }
 
-jstring cpp2jvm(string const &src);
-
-
 template<typename T>
 jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
 {
@@ -213,72 +283,108 @@ jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primi
 	return obj;
 }
 
+template<typename T>
+jobject_ptr cpp2jvm(optional<T> const &src, enable_if_primitive_t<T> * = nullptr)
+{
+    if (!src)
+        return wrap_null();
 
+    struct_runtime_type_desc_ptr runtime_desc = jvm_type_traits<optional<T>>::get_runtime_desc();
+    //return runtime_desc->create();
+
+    auto sig = make_method_signature<void, T>();
+    auto ctor = runtime_desc->find_method("<init>", sig);
+    auto obj = env_instance()->NewObject(runtime_desc->get_class(), ctor, *src);
+    process_jvm_exceptions();
+    return wrap(obj);
+}
+    
+
+template<typename T>
+jobject_ptr cpp2jvm(optional<T> const &src, enable_if_not_primitive_t<T> * = nullptr)
+{
+    if (!src)
+        return wrap_null();
+
+    return cpp2jvm(*src);
+}
+
+jobject_ptr cpp2jvm(string const &src);
+
+template<typename T>
+T jvm2cpp(typename jvm_type_traits<T>::jvm_type src);
 
 namespace detail
 {
-	template<typename T, typename Enable = void>
-	struct jvm2cpp_t;
-
-	template <typename T>
-	struct jvm2cpp_t<T, std::enable_if_t<jvm_type_traits<T>::is_primitive>>
+    template<typename T>
+    void jvm2cpp_impl(T src, T& dst, enable_if_primitive_t<T> * = nullptr)
 	{
-		static T process(T src)
-		{
-			return src;
-		}
-	};
+        dst = src;
+	}
 
-	template <typename T>
-	struct jvm2cpp_t<T, std::enable_if_t<!jvm_type_traits<T>::is_primitive>>
+    template<typename T>
+    void jvm2cpp_impl(jobject_ptr src, T &dst, enable_if_not_primitive_t<T> * = nullptr)
 	{
-		static T process(jobject_ptr src)
-		{
-            typedef jvm_type_traits<T> traits;
+        typedef jvm_type_traits<T> traits;
+        struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
 
-            struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
-            T result;
+        if (!src)
+        {
+            std::stringstream ss;
+            ss << "Trying to convert null '" << runtime_desc->java_name() << "' to non-optional cpp struct";
+            throw jvm_interop_error(ss.str());
+        }
+		    
 
-            detail::jvm2cpp_processor_t proc(runtime_desc, src);
-            reflect(proc, result);
+        detail::jvm2cpp_processor_t proc(runtime_desc, src);
+        reflect(proc, dst);
+    }
+    
+    template<typename T>
+    void jvm2cpp_impl(jobject_ptr src, optional<T> &dst, enable_if_primitive_t<T> * = nullptr)
+    {
+        if (!src)
+        {
+            dst = boost::none;
+            return;
+        }
 
-            return result;
-		}
-	};
+        struct_runtime_type_desc_ptr runtime_desc = jvm_type_traits<optional<T>>::get_runtime_desc();
 
-	template<>
-	struct jvm2cpp_t<string>
-	{
-		static string process(jobject_ptr src);
-	};
+        auto sig = make_method_signature<T>();
+        auto m = runtime_desc->find_method("getValue", sig);
+
+        dst = call_method<T>(src, m);
+    }
+
+    template<typename T>
+    void jvm2cpp_impl(jobject_ptr src, optional<T> &dst, enable_if_not_primitive_t<T> * = nullptr)
+    {
+        if (!src)
+        {
+            dst = boost::none;
+            return;
+        }
+
+        dst = jvm2cpp<T>(src);
+    }
+
+	
+    void jvm2cpp_impl(jobject_ptr src, string &dst);
 } // namespace detail
 
 template<typename T>
 T jvm2cpp(typename jvm_type_traits<T>::jvm_type src)
 {
-	return detail::jvm2cpp_t<T>::process(src);
+    T dst;
+    detail::jvm2cpp_impl(src, dst);
+    return dst;
 }
 
 
 
 
-JNIEnv *env_instance();
 
-struct jvm_interop_error
-	: std::runtime_error
-{
-	explicit jvm_interop_error(const string& _Message)
-		: runtime_error(_Message)
-	{
-	}
-
-	explicit jvm_interop_error(const char* _Message)
-		: runtime_error(_Message)
-	{
-	}
-};
-
-string make_method_signature(runtime_type_desc_ptr ret, vector<runtime_type_desc_ptr> args);
 
 template<typename Ret, typename... Args>
 string make_method_signature()
@@ -288,8 +394,6 @@ string make_method_signature()
         { jvm_type_traits<Args>::get_runtime_desc()... }
     );
 }
-
-void process_jvm_exceptions();
 
 namespace detail
 {
@@ -301,35 +405,24 @@ namespace detail
 	struct method_caller<type>									     						   \
 	{																						   \
 		template<typename... Args>															   \
-		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    		   \
+		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   \
 		{																					   \
-			type result = env_instance()->Call ## Type ## Method(obj->get_p(), method, std::forward<Args>(args)...);  \
-            process_jvm_exceptions(); \
-            return result; \
+			exceptions_handler h;                                                              \
+            return wrap(env_instance()->Call ## Type ## Method(obj->get_p(), method, unwrap(args)...)); \
 		}																					   \
 	};
 
-    template<>
-    struct method_caller<void>
-    {
-        template<typename... Args>
-        static void call(jobject_ptr obj, jmethodID method, Args&&... args)
-        {
-            env_instance()->CallVoidMethod(obj->get_p(), method, std::forward<Args>(args)...);
-            process_jvm_exceptions();
-        }
-    };
-    
-    template<> struct method_caller<jobject_ptr>
-    {
-        template<typename... Args>
-        static jobject_ptr call(jobject_ptr obj, jmethodID method, Args&&... args)
-        {
-            jobject_ptr result = wrap(env_instance()->CallObjectMethod(obj->get_p(), method, std::forward<Args>(args)...)); 
-            process_jvm_exceptions(); 
-            return result;
-        }
-    };
+template<>																				   
+struct method_caller<void>									     						   
+{																						   
+    template<typename... Args>															   
+    static void call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   
+    {																					   
+        exceptions_handler h;                                                              
+        env_instance()->CallVoidMethod(obj->get_p(), method, unwrap(args)...); 
+    }																					   
+};
+
 
 JVM_INTEROP_DEFINE_METHOD_CALLER(jboolean, Boolean)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jbyte   , Byte)
@@ -339,6 +432,7 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jfloat  , Float)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jint    , Int)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jlong   , Long)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jshort  , Short)
+JVM_INTEROP_DEFINE_METHOD_CALLER(jobject_ptr, Object)
 
 #undef JVM_INTEROP_DEFINE_METHOD_CALLER
 

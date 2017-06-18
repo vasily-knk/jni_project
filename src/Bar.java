@@ -1,6 +1,7 @@
 public class Bar {
     private int i;
     private String str;
+    private Float of;
 
 
     public Bar()
@@ -24,5 +25,14 @@ public class Bar {
     public void setStr(String str) {
         System.out.println("Setting str = " + str);
         this.str = str;
+    }
+
+    public Float getOf() {
+        return of;
+    }
+
+    public void setOf(Float of) {
+        System.out.println("Setting of = " + of);
+        this.of = of;
     }
 }

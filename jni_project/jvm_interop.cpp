@@ -68,8 +68,26 @@ void free_local_ref(jobject p)
 
 jobject_ptr wrap(jobject p)
 {
+    if (!p)
+        return nullptr;
+    
     return make_shared<jobject_wrapper>(p);
 }
+
+jobject_ptr wrap_null()
+{
+    return nullptr;
+}
+
+jobject unwrap(jobject_ptr p)
+{
+    if (!p)
+        return nullptr;
+
+    return p->get_p();
+}
+
+
 
 
 
@@ -91,25 +109,24 @@ string make_method_signature(runtime_type_desc_ptr ret, vector<runtime_type_desc
 	return ss.str();
 }
 
-jstring cpp2jvm(string const &src)
+jobject_ptr cpp2jvm(string const &src)
 {
-	return env_instance()->NewStringUTF(src.c_str());
+	return wrap(env_instance()->NewStringUTF(src.c_str()));
 }
 
 namespace detail
 {
 	
-	string jvm2cpp_t<string>::process(jobject_ptr src)
-	{
+    void jvm2cpp_impl(jobject_ptr src, string &dst)
+    {
 	    auto env = env_instance();
 
 	    auto src_str = static_cast<jstring>(src->get_p());
 
 	    char const *p = env->GetStringUTFChars(src_str, nullptr);
-	    string str(p);
+        dst = p;
 
         env->ReleaseStringUTFChars(src_str, p);
-        return str;
 	}
 
 } // namespace detail

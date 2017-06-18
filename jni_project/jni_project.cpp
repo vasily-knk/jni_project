@@ -9,6 +9,7 @@ struct bar
 {
 	jint i;
 	string str;
+    optional<float> of;
 
     template<typename Proc>
     friend void reflect(Proc &proc, bar const &const_val)
@@ -17,6 +18,7 @@ struct bar
 
         proc(val.i, "i");
         proc(val.str, "str");
+        proc(val.of, "of");
     }
 };
 
@@ -100,6 +102,7 @@ int main(int argc, char **argv)
     bar b;
     b.i = 10002;
     b.str = "Heya!";
+    b.of = 3.14f;
 
     bar b2;
 
