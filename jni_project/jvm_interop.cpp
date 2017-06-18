@@ -114,12 +114,25 @@ jobject_ptr cpp2jvm(string const &src)
     return wrap(env_instance()->NewStringUTF(src.c_str()));
 }
 
+
 namespace detail
 {
 	
+    void check_struct_jvm2cpp(jobject_ptr src, struct_runtime_type_desc_ptr runtime_desc)
+    {
+        if (!src)
+        {
+            std::stringstream ss;
+            ss << "Trying to convert null '" << runtime_desc->java_name() << "' to non-optional cpp struct";
+            throw jvm_interop_error(ss.str());
+        }
+    }
+
     void jvm2cpp_impl(jobject_ptr src, string &dst)
     {
 	    auto env = env_instance();
+        
+        check_struct_jvm2cpp(src, jvm_type_traits<string>::get_runtime_desc());
 
 	    auto src_str = static_cast<jstring>(src->get_p());
 
@@ -148,7 +161,7 @@ void process_jvm_exceptions()
         env->ExceptionClear();
         auto str_obj = env->CallObjectMethod(e->get_p(), getMessage);
 
-        auto str ="";// jvm2cpp<string>(wrap(str_obj));
+        auto str = jvm2cpp<string>(wrap(str_obj));
 
         env->ExceptionClear();                          
 

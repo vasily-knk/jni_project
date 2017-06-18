@@ -26,14 +26,8 @@ public class Bar {
     }
 
     public void setStr(String str) {
-        try {
-            System.out.println("Setting str = " + str);
-        } catch (NullPointerException e)
-        {
-            System.out.println("NPE!!!");
-            return;
-        }
-        this.str = str;
+        System.out.println("Setting str = " + str);
+        this.str = null;
     }
 
     public Float getOf() {

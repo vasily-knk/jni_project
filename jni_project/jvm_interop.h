@@ -304,8 +304,12 @@ jobject_ptr cpp2jvm(string const &src);
 template<typename T>
 T jvm2cpp(jvm_type_t<T> src);
 
+
 namespace detail
 {
+    void check_struct_jvm2cpp(jobject_ptr src, struct_runtime_type_desc_ptr);
+
+
     template<typename T>
     void jvm2cpp_impl(T src, T& dst, enable_if_primitive_t<T> * = nullptr)
 	{
@@ -318,13 +322,7 @@ namespace detail
         typedef jvm_type_traits<T> traits;
         struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
 
-        if (!src)
-        {
-            std::stringstream ss;
-            ss << "Trying to convert null '" << runtime_desc->java_name() << "' to non-optional cpp struct";
-            throw jvm_interop_error(ss.str());
-        }
-		    
+        check_struct_jvm2cpp(src, runtime_desc);
 
         detail::jvm2cpp_processor_t proc(runtime_desc, src);
         reflect(proc, dst);
@@ -394,35 +392,7 @@ namespace detail
 	template<typename T>
     struct method_caller;
 
-//#define JVM_INTEROP_DEFINE_METHOD_CALLER(type, Type) \
-//	template<>																				   \
-//	struct method_caller<type>									     						   \
-//	{																						   \
-//		template<typename... Args>															   \
-//		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   \
-//		{																					   \
-//            return wrap(env_instance()->Call ## Type ## Method(obj->get_p(), method, unwrap(args)...)); \
-//            process_jvm_exceptions(); \
-//		}																					   \
-//	};
-//
-//template<>																				   
-//struct method_caller<void>									     						   
-//{																						   
-//    template<typename... Args>															   
-//    static void call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   
-//    {																					   
-//        env_instance()->CallVoidMethod(obj->get_p(), method, unwrap(args)...); 
-//        process_jvm_exceptions();
-//    }
-//    
-//    template<typename... Args>
-//    static void call_static(jclass clazz, jmethodID method, Args&&... args)
-//    {
-//        env_instance()->CallStaticVoidMethod(clazz, method, unwrap(cpp2jvm(args))...);
-//        process_jvm_exceptions();
-//    }
-//};
+
 
 template<typename T>
 struct jni_method_caller_traits;
@@ -461,17 +431,7 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jobject , Object)
 JVM_INTEROP_DEFINE_METHOD_CALLER(void, Void)
 
 #undef JVM_INTEROP_DEFINE_METHOD_CALLER
-
-inline jvalue make_jvalue(jboolean val) { jvalue dst; dst.z = val; return dst;}
-inline jvalue make_jvalue(jbyte    val) { jvalue dst; dst.b = val; return dst;}
-inline jvalue make_jvalue(jchar    val) { jvalue dst; dst.c = val; return dst;}
-inline jvalue make_jvalue(jshort   val) { jvalue dst; dst.s = val; return dst;}
-inline jvalue make_jvalue(jint     val) { jvalue dst; dst.i = val; return dst;}
-inline jvalue make_jvalue(jlong    val) { jvalue dst; dst.j = val; return dst;}
-inline jvalue make_jvalue(jfloat   val) { jvalue dst; dst.f = val; return dst;}
-inline jvalue make_jvalue(jdouble  val) { jvalue dst; dst.d = val; return dst;}
-inline jvalue make_jvalue(jobject  val) { jvalue dst; dst.l = val; return dst;}
-    
+   
 
 template<typename T, typename... Args>
 T call_method_unwrapped_ret(jobject_ptr obj, jmethodID method, Args&&... args)
