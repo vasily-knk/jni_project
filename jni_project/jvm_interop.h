@@ -87,14 +87,16 @@ template<typename T>
 struct jvm_primitive_type_traits
 {
 	typedef T jvm_type;
-	static const bool is_primitive = true;
+    typedef T unwrapped_jvm_type;
+    static const bool is_primitive = true;
 };
 
 template<typename T>
 struct jvm_struct_type_traits
 {
 	typedef jobject_ptr jvm_type;
-	static const bool is_primitive = false;
+    typedef jobject unwrapped_jvm_type;
+    static const bool is_primitive = false;
 };
 
 template<typename T>
@@ -113,7 +115,7 @@ T wrap(T val, enable_if_primitive_t<T> * = nullptr)
     return val;
 }
 
-jobject unwrap(jobject_ptr p);
+jobject unwrap(jobject_ptr const &p);
 
 template<typename T>
 T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
@@ -172,6 +174,7 @@ JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V', "java.lang.Void")
 
 JVM_INTEROP_DECLARE_STRUCT_TYPE(string, "java.lang.String")
 
+
 template<typename T>
 runtime_type_desc_ptr get_runtime_type_desc()
 {
@@ -182,6 +185,12 @@ runtime_type_desc_ptr get_runtime_type_desc()
 
 template<typename T>
 using jvm_type_t = typename jvm_type_traits<T>::jvm_type;
+
+template<typename T>
+using unwrapped_jvm_type_t = typename jvm_type_traits<T>::unwrapped_jvm_type;
+
+static_assert(std::is_same<jvm_interop::unwrapped_jvm_type_t<string>, jobject>::value, "AAA");
+static_assert(std::is_same<jvm_interop::jvm_type_t<string>, jobject_ptr>::value, "AAA");
 
 template<typename T, typename... Args>
 T call_method(jobject_ptr obj, jmethodID method, Args&&... args);
@@ -209,12 +218,10 @@ namespace detail
         template<typename T>
         void operator()(T const &field_src, char const *name) 
         {
-            auto field_dst = cpp2jvm(field_src);
-
             auto field_desc = jvm_type_traits<T>::get_runtime_desc();
             jmethodID setter = desc_->setter(name, field_desc);
 
-            call_method<void>(dst_, setter, field_dst);
+            call_method<void>(dst_, setter, field_src);
         }
 
     private:
@@ -236,11 +243,7 @@ namespace detail
             auto field_desc = jvm_type_traits<T>::get_runtime_desc();
             jmethodID getter = desc_->getter(name, field_desc);
 
-            typedef typename jvm_type_traits<T>::jvm_type jvm_type;
-            
-            auto interm = call_method<jvm_type>(src_, getter);
-
-            field_dst = jvm2cpp<T>(interm);
+            field_dst = call_method<T>(src_, getter);
         }
 
     private:
@@ -299,7 +302,7 @@ jobject_ptr cpp2jvm(optional<T> const &src, enable_if_not_primitive_t<T> * = nul
 jobject_ptr cpp2jvm(string const &src);
 
 template<typename T>
-T jvm2cpp(typename jvm_type_traits<T>::jvm_type src);
+T jvm2cpp(jvm_type_t<T> src);
 
 namespace detail
 {
@@ -364,7 +367,7 @@ namespace detail
 } // namespace detail
 
 template<typename T>
-T jvm2cpp(typename jvm_type_traits<T>::jvm_type src)
+T jvm2cpp(jvm_type_t<T> src)
 {
     T dst;
     detail::jvm2cpp_impl(src, dst);
@@ -385,40 +388,65 @@ string make_method_signature()
     );
 }
 
+
 namespace detail
 {
 	template<typename T>
     struct method_caller;
 
-#define JVM_INTEROP_DEFINE_METHOD_CALLER(type, Type) \
-	template<>																				   \
-	struct method_caller<type>									     						   \
-	{																						   \
-		template<typename... Args>															   \
-		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   \
-		{																					   \
-            return wrap(env_instance()->Call ## Type ## Method(obj->get_p(), method, unwrap(args)...)); \
-            process_jvm_exceptions(); \
-		}																					   \
-	};
+//#define JVM_INTEROP_DEFINE_METHOD_CALLER(type, Type) \
+//	template<>																				   \
+//	struct method_caller<type>									     						   \
+//	{																						   \
+//		template<typename... Args>															   \
+//		static type call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   \
+//		{																					   \
+//            return wrap(env_instance()->Call ## Type ## Method(obj->get_p(), method, unwrap(args)...)); \
+//            process_jvm_exceptions(); \
+//		}																					   \
+//	};
+//
+//template<>																				   
+//struct method_caller<void>									     						   
+//{																						   
+//    template<typename... Args>															   
+//    static void call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   
+//    {																					   
+//        env_instance()->CallVoidMethod(obj->get_p(), method, unwrap(args)...); 
+//        process_jvm_exceptions();
+//    }
+//    
+//    template<typename... Args>
+//    static void call_static(jclass clazz, jmethodID method, Args&&... args)
+//    {
+//        env_instance()->CallStaticVoidMethod(clazz, method, unwrap(cpp2jvm(args))...);
+//        process_jvm_exceptions();
+//    }
+//};
 
-template<>																				   
-struct method_caller<void>									     						   
-{																						   
-    template<typename... Args>															   
-    static void call(jobject_ptr obj, jmethodID method, Args&&... args)			    	   
-    {																					   
-        env_instance()->CallVoidMethod(obj->get_p(), method, unwrap(args)...); 
-        process_jvm_exceptions();
-    }
-    
-    template<typename... Args>
-    static void call_static(jclass clazz, jmethodID method, Args&&... args)
-    {
-        env_instance()->CallStaticVoidMethod(clazz, method, unwrap(cpp2jvm(args))...);
-        process_jvm_exceptions();
-    }
-};
+template<typename T>
+struct jni_method_caller_traits;
+
+#define JVM_INTEROP_DEFINE_METHOD_CALLER(type, Type)                            \
+    template<>                                                                  \
+    struct jni_method_caller_traits<type>                                       \
+    {                                                                           \
+        typedef type ret_type;                                                  \
+                                                                                \
+        using caller_fn = ret_type(JNIEnv::*)(jobject, jmethodID, ...);         \
+        using static_caller_fn = ret_type(JNIEnv::*)(jclass, jmethodID, ...);   \
+                                                                                \
+        static caller_fn get_caller_fn()                                        \
+        {                                                                       \
+            return &JNIEnv::Call ## Type ## Method;                             \
+        }                                                                       \
+                                                                                \
+        static static_caller_fn get_static_caller_fn()                          \
+        {                                                                       \
+            return &JNIEnv::CallStatic ## Type ## Method;                       \
+        }                                                                       \
+    };
+
 
 
 JVM_INTEROP_DEFINE_METHOD_CALLER(jboolean, Boolean)
@@ -429,9 +457,83 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jfloat  , Float)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jint    , Int)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jlong   , Long)
 JVM_INTEROP_DEFINE_METHOD_CALLER(jshort  , Short)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jobject_ptr, Object)
+JVM_INTEROP_DEFINE_METHOD_CALLER(jobject , Object)
+JVM_INTEROP_DEFINE_METHOD_CALLER(void, Void)
 
 #undef JVM_INTEROP_DEFINE_METHOD_CALLER
+
+inline jvalue make_jvalue(jboolean val) { jvalue dst; dst.z = val; return dst;}
+inline jvalue make_jvalue(jbyte    val) { jvalue dst; dst.b = val; return dst;}
+inline jvalue make_jvalue(jchar    val) { jvalue dst; dst.c = val; return dst;}
+inline jvalue make_jvalue(jshort   val) { jvalue dst; dst.s = val; return dst;}
+inline jvalue make_jvalue(jint     val) { jvalue dst; dst.i = val; return dst;}
+inline jvalue make_jvalue(jlong    val) { jvalue dst; dst.j = val; return dst;}
+inline jvalue make_jvalue(jfloat   val) { jvalue dst; dst.f = val; return dst;}
+inline jvalue make_jvalue(jdouble  val) { jvalue dst; dst.d = val; return dst;}
+inline jvalue make_jvalue(jobject  val) { jvalue dst; dst.l = val; return dst;}
+    
+
+template<typename T, typename... Args>
+T call_method_unwrapped_ret(jobject_ptr obj, jmethodID method, Args&&... args)
+{
+    typedef detail::jni_method_caller_traits<T> traits;
+    auto fn = traits::get_caller_fn();
+
+    return std::invoke(fn, env_instance(), unwrap(obj), method, unwrap(cpp2jvm(args))...);
+}
+
+template<typename T, typename... Args>
+T call_static_method_unwrapped_ret(jclass clazz, jmethodID method, Args&&... args)
+{
+    typedef detail::jni_method_caller_traits<T> traits;
+    auto fn = traits::get_static_caller_fn();
+
+    return std::invoke(fn, env_instance(), clazz, method, unwrap(cpp2jvm(args))...);
+}
+
+template<typename T>
+struct method_caller_t
+{
+    typedef unwrapped_jvm_type_t<T> unwrapped_type_t;
+    typedef jvm_type_t<T> wrapped_type_t;
+
+    template<typename... Args>
+    static T call(jobject_ptr obj, jmethodID method, Args&&... args)
+    {
+        unwrapped_type_t ret = call_method_unwrapped_ret<unwrapped_type_t, Args...>(obj, method, std::forward<Args>(args)...);
+        process_jvm_exceptions();
+
+        return jvm2cpp<T>(wrap(ret));
+    }
+    
+    template<typename... Args>
+    static T call_static(jclass clazz, jmethodID method, Args&&... args)
+    {
+        unwrapped_type_t ret = call_static_method_unwrapped_ret<unwrapped_type_t, Args...>(clazz, method, std::forward<Args>(args)...);
+        process_jvm_exceptions();
+
+        return jvm2cpp<T>(wrap(ret));
+    }
+};
+
+template<>
+struct method_caller_t<void>
+{
+    template<typename... Args>
+    static void call(jobject_ptr obj, jmethodID method, Args&&... args)
+    {
+        call_method_unwrapped_ret<void, Args...>(obj, method, std::forward<Args>(args)...);
+        process_jvm_exceptions();
+    }
+
+    template<typename... Args>
+    static void call_static(jclass clazz, jmethodID method, Args&&... args)
+    {
+        call_static_method_unwrapped_ret<void, Args...>(clazz, method, std::forward<Args>(args)...);
+        process_jvm_exceptions();
+    }
+
+};
 
 
 } // namespace detail
@@ -440,7 +542,13 @@ JVM_INTEROP_DEFINE_METHOD_CALLER(jobject_ptr, Object)
 template<typename T, typename... Args>
 T call_method(jobject_ptr obj, jmethodID method, Args&&... args)
 {
-	return detail::method_caller<T>::call(obj, method, std::forward<Args>(args)...);
+    return detail::method_caller_t<T>::call(obj, method, std::forward<Args>(args)...);
+}
+
+template<typename T, typename... Args>
+T call_static_method(jclass clazz, jmethodID method, Args&&... args)
+{
+    return detail::method_caller_t<T>::call_static(clazz, method, std::forward<Args>(args)...);
 }
 
 jclass find_class(char const *name);
@@ -467,7 +575,7 @@ struct method_t
 
         Ret operator()(Args&&...args) const
         {
-            return detail::method_caller<Ret>::call(obj, id, std::forward<Args>(args)...);
+            return call_method<Ret>(obj, id, std::forward<Args>(args)...);
         }
 
         jobject_ptr obj;
@@ -497,7 +605,7 @@ struct static_method_t
 
     Ret operator()(Args&&...args) const
     {
-        return detail::method_caller<Ret>::call_static(clazz, id, std::forward<Args>(args)...);
+        return call_static_method<Ret>(clazz, id, std::forward<Args>(args)...);
     }
 
 private:

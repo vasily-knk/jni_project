@@ -45,11 +45,11 @@ JVM_INTEROP_DECLARE_STRUCT_TYPE(bar, "Bar")
 JVM_INTEROP_DECLARE_STRUCT_TYPE(baz, "Baz")
 
 
-void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
-{
-	auto ptr = reinterpret_cast<uint8_t *>(&val);
-	std::cout << "FOOOING: " << val << "\n";
-}
+//void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
+//{
+//	auto ptr = reinterpret_cast<uint8_t *>(&val);
+//	std::cout << "FOOOING: " << val << "\n";
+//}
 
 
 void JNICALL onBaz_c(JNIEnv *env, jobject self_raw, jobject b_raw)
@@ -60,6 +60,7 @@ void JNICALL onBaz_c(JNIEnv *env, jobject self_raw, jobject b_raw)
 
     int aaa = 5;
 }
+
 
 int main(int argc, char **argv)
 {
@@ -155,11 +156,13 @@ int main(int argc, char **argv)
 
         b2 = jvm2cpp<bar>(jb);
 
+	    float (JNIEnv_::*p)(_jobject*, _jmethodID*,...) = &JNIEnv::CallFloatMethod;
+
 
         jclass demo_jclass = find_class("org/jnijvm/Demo");
         auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");
 
-        sm("Vasya", 32, 116.99);
+        sm("Vasya", 32, 116.99f);
 
 	} 
 	catch (jvm_interop_error const &e)
@@ -171,3 +174,5 @@ int main(int argc, char **argv)
                                  
     return 0;
 }
+
+

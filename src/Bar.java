@@ -26,7 +26,13 @@ public class Bar {
     }
 
     public void setStr(String str) {
-        System.out.println("Setting str = " + str);
+        try {
+            System.out.println("Setting str = " + str);
+        } catch (NullPointerException e)
+        {
+            System.out.println("NPE!!!");
+            return;
+        }
         this.str = str;
     }
 
@@ -35,7 +41,6 @@ public class Bar {
     }
 
     public void setOf(Float of) {
-        System.out.println("Setting of = " + of);
         this.of = of;
     }
 

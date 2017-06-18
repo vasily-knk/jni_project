@@ -79,7 +79,7 @@ jobject_ptr wrap_null()
     return nullptr;
 }
 
-jobject unwrap(jobject_ptr p)
+jobject unwrap(jobject_ptr const &p)
 {
     if (!p)
         return nullptr;
@@ -111,7 +111,7 @@ string make_method_signature(runtime_type_desc_ptr ret, vector<runtime_type_desc
 
 jobject_ptr cpp2jvm(string const &src)
 {
-	return wrap(env_instance()->NewStringUTF(src.c_str()));
+    return wrap(env_instance()->NewStringUTF(src.c_str()));
 }
 
 namespace detail
@@ -140,14 +140,17 @@ void process_jvm_exceptions()
     {
         auto e = wrap(env->ExceptionOccurred());
         
-        env->ExceptionClear(); 
 
         jclass clazz = env->GetObjectClass(e->get_p());
         jmethodID getMessage = env->GetMethodID(clazz, "getMessage", "()Ljava/lang/String;");
+        env->ExceptionDescribe();
         
-        auto str = string();// jvm2cpp<string>(call_method<jobject_ptr>(e, getMessage));
-
         env->ExceptionClear();
+        auto str_obj = env->CallObjectMethod(e->get_p(), getMessage);
+
+        auto str ="";// jvm2cpp<string>(wrap(str_obj));
+
+        env->ExceptionClear();                          
 
         std::stringstream ss;
         ss << "JVM Exception: " << str;
