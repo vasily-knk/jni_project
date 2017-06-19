@@ -22,6 +22,7 @@ using std::shared_ptr;
 using std::make_shared;
 
 #include <sstream>
+#include <fstream>
 
 #include <type_traits>
 
@@ -33,3 +34,8 @@ using boost::optional;
 
 #include <set>
 #include <map>
+
+#include <filesystem>
+
+namespace fs = std::experimental::filesystem;
+

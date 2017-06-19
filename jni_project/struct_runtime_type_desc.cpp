@@ -1,50 +1,21 @@
 #include "stdafx.h"
 
 #include "jvm_interop.h"
+#include "java_generator.h"
 
 namespace jvm_interop
 {
-    namespace
-    {
-        string fix_field_name(char const *name)
-        {
-            string result = name;
-
-            if (!result.empty())
-            {
-                char &c = result.at(0);
-                if (c >= 'a' && c <= 'z')
-                    c += 'A' - 'a';
-            }
-            
-            return result;
-        }
-
-        string make_getter_name(char const *name)
-        {
-            return "get" + fix_field_name(name);
-        }
-
-        string make_setter_name(char const *name)
-        {
-            return "set" + fix_field_name(name);
-        }
-
-    } // namespace
-
 	struct struct_runtime_type_desc_impl
 		: struct_runtime_type_desc
 	{
-		explicit struct_runtime_type_desc_impl(char const *dot_separated_name, bool needs_generation)
-            : needs_generation_(needs_generation)
+		explicit struct_runtime_type_desc_impl(char const *dot_separated_name, bool /*needs_generation*/)
 		{
-			vector<string> s;
-			boost::algorithm::split(s, dot_separated_name, boost::is_any_of("."));
+			boost::algorithm::split(split_name_, dot_separated_name, boost::is_any_of("."));
 
-			lookup_name_ = boost::algorithm::join(s, "/");
+			lookup_name_ = boost::algorithm::join(split_name_, "/");
 			signature_ = "L" + lookup_name_ + ";";
 
-			java_name_ = boost::algorithm::join(s, ".");
+			java_name_ = boost::algorithm::join(split_name_, ".");
 
 		}
 		
@@ -111,10 +82,12 @@ namespace jvm_interop
             return get_method(clazz, method_name.c_str(), sig.c_str());
         }
 
-	    bool needs_generation() 
+
+        vector<string> const &split_name() override
         {
-            return needs_generation_;
+            return split_name_;
         }
+
     private:
 
 		jclass get_jclass() const
@@ -128,10 +101,11 @@ namespace jvm_interop
 		}
 
 	private:
-		string signature_;
+        vector<string> split_name_;
+
+        string signature_;
 		string java_name_;
 		string lookup_name_;
-        bool needs_generation_;
 
 		mutable jclass clazz_ = nullptr;
 	};

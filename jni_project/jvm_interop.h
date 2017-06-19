@@ -73,6 +73,8 @@ struct struct_runtime_type_desc
 	virtual jmethodID setter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
 
     virtual jmethodID find_method(string const &method_name, string const &sig) = 0;
+
+    virtual vector<string> const &split_name() = 0;
 };
 
 

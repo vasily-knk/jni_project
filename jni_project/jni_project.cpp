@@ -42,8 +42,8 @@ struct bar
     }
 };
 
-JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(bar, "Bar")
-JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(baz, "Baz")
+JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(bar, "org.vasya.Bar")
+JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(baz, "org.vasya.Baz")
 
 
 //void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
@@ -148,22 +148,22 @@ int main(int argc, char **argv)
         struct_fields_map_t fields_map;
 	    append_struct_fields(b, fields_map);
 
-	    auto bar_jclass = jvm_type_traits<bar>::get_runtime_desc()->get_class();
-
-        register_native<void, baz>(bar_jclass, "onBz", onBaz_c);
-
+        generate_java_structs(fields_map, "../src");
+//
         jobject_ptr jb = cpp2jvm(b);
-
-        auto m = get_method<void, double>(bar_jclass, "doSomething");
-
-        m(jb)(256.4);
-
         b2 = jvm2cpp<bar>(jb);
 
-        jclass demo_jclass = find_class("org/jnijvm/Demo");
-        auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");
 
-        sm("Vasya", 32, 116.99f);
+        //
+//        auto m = get_method<void, double>(bar_jclass, "doSomething");
+//
+//        m(jb)(256.4);
+//
+//
+//        jclass demo_jclass = find_class("org/jnijvm/Demo");
+//        auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");
+//
+//        sm("Vasya", 32, 116.99f);
 
 	} 
 	catch (jvm_interop_error const &e)
