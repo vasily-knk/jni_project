@@ -63,7 +63,7 @@ namespace
         
         for (auto const &field : st.fields)
         {
-            out << indent() << "private " << field.rttd->java_name() << " " << field.name << ";\n";
+            out << indent() << "protected " << field.rttd->java_name() << " " << field.name << ";\n";
         }
 
         out << "\n";

@@ -36,55 +36,47 @@ namespace jvm_interop
         }
 
         template<typename T>
-        void operator()(T const &field, char const *name, enable_if_primitive_t<T> * = nullptr) const
+        void operator()(T const &field, char const *name) const
         {
-            process_primitive_field(field, name);
-        }
-
-        template<typename T>
-        void operator()(T const &field, char const *name, enable_if_not_primitive_t<T> * = nullptr) const
-        {
-            process_struct_field(field, name);
+            append_field(field, name);
+            process_type<T>();
         }
         
         template<typename T>
         void operator()(optional<T> const &opt_field, char const *name)
         {
             append_field(opt_field, name);
-//            T const &field = opt_field.get_value_or(T());
-//
-//            (*this)(field, name);
+            process_type<T>();
         }
 
     private:
         template<typename T>
-        void process_primitive_field(T const &field, char const *name) const
+        void process_type(enable_if_primitive_t<T> * = nullptr) const
         {
-            append_field(field, name);
-        }
-
-
-        template<typename T>
-        void process_struct_field(T const &field, char const *name, std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
-        {
-            append_field(field, name);
         }
 
         template<typename T>
-        void process_struct_field(T const &field, char const *name, std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
+        void process_type(enable_if_not_primitive_t<T> * = nullptr) const
         {
-            append_field(field, name);
-
-            if (jvm_type_traits<T>::needs_generation)
-            {
-                auto desc = jvm_type_traits<T>::get_runtime_desc();
-                
-                string const &java_name = desc->java_name();
-                if (dst_.count(java_name) == 0)
-                    append_struct_fields<T>(field, dst_);
-            }
+            process_struct_type<T>();
         }
-        
+
+        template<typename T>
+        void process_struct_type(std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
+        {
+        }
+
+        template<typename T>
+        void process_struct_type(std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
+        {
+            auto desc = jvm_type_traits<T>::get_runtime_desc();
+
+            string const &java_name = desc->java_name();
+            if (dst_.count(java_name) == 0)
+                append_struct_fields<T>(dst_);
+        }
+
+
 
     private:
         template<typename T>
@@ -101,11 +93,13 @@ namespace jvm_interop
 
 
     template<typename T>
-    void append_struct_fields(T const &s, struct_fields_map_t &dst)
+    void append_struct_fields(struct_fields_map_t &dst)
     {
         auto desc = jvm_type_traits<T>::get_runtime_desc();
 
         append_struct_fields_processor proc(desc, dst);
+
+        T s;
         reflect(proc, s);
     }
 

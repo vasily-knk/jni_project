@@ -25,7 +25,7 @@ struct bar
     optional<float> of;
     optional<string> ostr;
 
-    baz bz;
+    //baz bz;
     optional<baz> obz;
 
     template<typename Proc>
@@ -37,7 +37,7 @@ struct bar
         proc(val.str, "str");
         proc(val.of, "of");
         proc(val.ostr, "ostr");
-        proc(val.bz, "bz");
+        //proc(val.bz, "bz");
         proc(val.obz, "obz");
     }
 };
@@ -63,10 +63,9 @@ void JNICALL onBaz_c(JNIEnv *env, jobject self_raw, jobject b_raw)
 }
 
 
-int main(int argc, char **argv)
+int amain(int argc, char **argv)
 {
 
-	JNIEnv *env = jvm_interop::env_instance();
 
 //	jclass jcls = env->FindClass("org/jnijvm/Demo");
 //	if (!jcls) 
@@ -137,7 +136,6 @@ int main(int argc, char **argv)
     b.of = 3.14f;
     b.ostr = "HAAA";
 
-    b.bz.hhh = 117;
     b.obz = baz();
 
     bar b2;
@@ -146,7 +144,7 @@ int main(int argc, char **argv)
 	try
 	{
         struct_fields_map_t fields_map;
-	    append_struct_fields(b, fields_map);
+	    //append_struct_fields(b, fields_map);
 
         generate_java_structs(fields_map, "../src");
 //
@@ -176,4 +174,55 @@ int main(int argc, char **argv)
     return 0;
 }
 
+void generate()
+{
+    using namespace jvm_interop;
 
+    struct_fields_map_t fields_map;
+    append_struct_fields<bar>(fields_map);
+
+    generate_java_structs(fields_map, "../src");
+}
+
+void interop()
+{
+    using namespace jvm_interop;
+
+    bar b;
+    b.i = 10002;
+    b.str = "Heya!";
+    b.of = 3.14f;
+    b.ostr = "HAAA";
+
+    b.obz = baz();
+
+    bar b2;
+
+
+    try
+    {
+        JNIEnv *env = jvm_interop::env_instance();
+
+        jobject_ptr jb = cpp2jvm(b);
+        
+        jclass demo_jclass = find_class("org/jnijvm/Demo");
+        auto sm = get_static_method<bar, bar>(demo_jclass, "modifyBar");
+
+        b2 = sm(b);
+
+
+    }
+    catch (jvm_interop_error const &e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+
+
+
+}
+
+int main(int argc, char **argv)
+{
+    //generate();
+    interop();
+}

@@ -540,9 +540,9 @@ struct method_t
             , id(id)
         {}
 
-        Ret operator()(Args&&...args) const
+        Ret operator()(Args const &... args) const
         {
-            return call_method<Ret>(obj, id, std::forward<Args>(args)...);
+            return call_method<Ret>(obj, id, args...);
         }
 
         jobject_ptr obj;
@@ -570,9 +570,9 @@ struct static_method_t
         , id(id)
     {}
 
-    Ret operator()(Args&&...args) const
+    Ret operator()(Args const &... args) const
     {
-        return call_static_method<Ret>(clazz, id, std::forward<Args>(args)...);
+        return call_static_method<Ret>(clazz, id, args...);
     }
 
 private:
