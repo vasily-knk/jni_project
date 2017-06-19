@@ -25,6 +25,11 @@ struct primitive_runtime_type_desc_impl
 		return java_name_;
 	}
 
+    bool needs_generation() 
+    {
+        return false;
+    }
+
 private:
 	string java_name_;
 	string signature_;

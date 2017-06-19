@@ -30,3 +30,6 @@ using std::make_shared;
 
 #include <boost/optional.hpp>
 using boost::optional;
+
+#include <set>
+#include <map>

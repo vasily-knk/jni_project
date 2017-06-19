@@ -77,7 +77,7 @@ struct struct_runtime_type_desc
 
 
 runtime_type_desc_ptr create_primitive_runtime_type_desc(char const *java_name, char sig);
-struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name);
+struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name, bool needs_generation);
 
 template<typename T>
 struct jvm_type_traits;
@@ -89,6 +89,8 @@ struct jvm_primitive_type_traits
 	typedef T jvm_type;
     typedef T unwrapped_jvm_type;
     static const bool is_primitive = true;
+
+    static const bool needs_generation = false;
 };
 
 template<typename T>
@@ -123,17 +125,18 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
     return val;
 }
 
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name) \
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
 	template<> \
 	struct jvm_interop::jvm_type_traits<cpp_type> \
 		: jvm_interop::jvm_struct_type_traits<cpp_type> \
 	{ \
 		static jvm_interop::struct_runtime_type_desc_ptr get_runtime_desc() \
 		{ \
-			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
+			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name, needs_generation_flag); \
 			return p; \
 		} \
-	}; 
+        static const bool needs_generation = needs_generation_flag; \
+    };
 
 #define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
 	template<> \
@@ -146,19 +149,21 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 			return p; \
 		} \
 	}; \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<cpp_type>, boxed_name) 
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<cpp_type>, boxed_name, false) 
 
 
 
     
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name) \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name) \
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, needs_generation_flag) \
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
 	template<> \
 	struct jvm_interop::jvm_type_traits<optional<cpp_type>> \
         : jvm_interop::jvm_type_traits<cpp_type> {};
 
 
-
+#define JVM_INTEROP_DECLARE_BUILTIN_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, false) 
+  
+#define JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, true) 
 
 
 
@@ -172,7 +177,7 @@ JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jlong   , "long"   , 'J', "java.lang.Long")
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jshort  , "short"  , 'S', "java.lang.Short") 
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V', "java.lang.Void") 
 
-JVM_INTEROP_DECLARE_STRUCT_TYPE(string, "java.lang.String")
+JVM_INTEROP_DECLARE_BUILTIN_STRUCT_TYPE(string, "java.lang.String")
 
 
 template<typename T>

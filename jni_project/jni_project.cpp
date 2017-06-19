@@ -4,6 +4,7 @@
 #include "stdafx.h"
 
 #include "jvm_interop.h"
+#include "java_generator.h"
 
 struct baz
 {
@@ -41,8 +42,8 @@ struct bar
     }
 };
 
-JVM_INTEROP_DECLARE_STRUCT_TYPE(bar, "Bar")
-JVM_INTEROP_DECLARE_STRUCT_TYPE(baz, "Baz")
+JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(bar, "Bar")
+JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(baz, "Baz")
 
 
 //void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
@@ -144,7 +145,10 @@ int main(int argc, char **argv)
 
 	try
 	{
-        auto bar_jclass = jvm_type_traits<bar>::get_runtime_desc()->get_class();
+        struct_fields_map_t fields_map;
+	    append_struct_fields(b, fields_map);
+
+	    auto bar_jclass = jvm_type_traits<bar>::get_runtime_desc()->get_class();
 
         register_native<void, baz>(bar_jclass, "onBz", onBaz_c);
 
@@ -155,9 +159,6 @@ int main(int argc, char **argv)
         m(jb)(256.4);
 
         b2 = jvm2cpp<bar>(jb);
-
-	    float (JNIEnv_::*p)(_jobject*, _jmethodID*,...) = &JNIEnv::CallFloatMethod;
-
 
         jclass demo_jclass = find_class("org/jnijvm/Demo");
         auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");

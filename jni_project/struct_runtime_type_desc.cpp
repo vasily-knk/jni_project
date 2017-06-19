@@ -35,7 +35,8 @@ namespace jvm_interop
 	struct struct_runtime_type_desc_impl
 		: struct_runtime_type_desc
 	{
-		explicit struct_runtime_type_desc_impl(char const *dot_separated_name)
+		explicit struct_runtime_type_desc_impl(char const *dot_separated_name, bool needs_generation)
+            : needs_generation_(needs_generation)
 		{
 			vector<string> s;
 			boost::algorithm::split(s, dot_separated_name, boost::is_any_of("."));
@@ -110,6 +111,10 @@ namespace jvm_interop
             return get_method(clazz, method_name.c_str(), sig.c_str());
         }
 
+	    bool needs_generation() 
+        {
+            return needs_generation_;
+        }
     private:
 
 		jclass get_jclass() const
@@ -126,12 +131,14 @@ namespace jvm_interop
 		string signature_;
 		string java_name_;
 		string lookup_name_;
+        bool needs_generation_;
+
 		mutable jclass clazz_ = nullptr;
 	};
 
-	struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name)
+	struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name, bool needs_generation)
 	{
-		return make_shared<struct_runtime_type_desc_impl>(dot_separated_name);
+		return make_shared<struct_runtime_type_desc_impl>(dot_separated_name, needs_generation);
 	}
 
 } // namespace jvm_interop

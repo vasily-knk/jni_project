@@ -154,11 +154,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="java_generator.h" />
     <ClInclude Include="jvm_interop.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="java_generator.cpp" />
     <ClCompile Include="jni_project.cpp" />
     <ClCompile Include="jvm_interop.cpp" />
     <ClCompile Include="primitive_runtime_type_desc.cpp" />
