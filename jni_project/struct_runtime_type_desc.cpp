@@ -8,7 +8,7 @@ namespace jvm_interop
 	struct struct_runtime_type_desc_impl
 		: struct_runtime_type_desc
 	{
-		explicit struct_runtime_type_desc_impl(char const *dot_separated_name, bool /*needs_generation*/)
+		explicit struct_runtime_type_desc_impl(char const *dot_separated_name)
 		{
 			boost::algorithm::split(split_name_, dot_separated_name, boost::is_any_of("."));
 
@@ -110,9 +110,9 @@ namespace jvm_interop
 		mutable jclass clazz_ = nullptr;
 	};
 
-	struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name, bool needs_generation)
+	struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name)
 	{
-		return make_shared<struct_runtime_type_desc_impl>(dot_separated_name, needs_generation);
+		return make_shared<struct_runtime_type_desc_impl>(dot_separated_name);
 	}
 
 } // namespace jvm_interop

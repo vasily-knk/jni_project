@@ -79,7 +79,7 @@ struct struct_runtime_type_desc
 
 
 runtime_type_desc_ptr create_primitive_runtime_type_desc(char const *java_name, char sig);
-struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name, bool needs_generation);
+struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name);
 
 template<typename T>
 struct jvm_type_traits;
@@ -134,7 +134,7 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 	{ \
 		static jvm_interop::struct_runtime_type_desc_ptr get_runtime_desc() \
 		{ \
-			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name, needs_generation_flag); \
+			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
 			return p; \
 		} \
         static const bool needs_generation = needs_generation_flag; \
