@@ -91,16 +91,30 @@ struct jvm_primitive_type_traits
 	typedef T jvm_type;
     typedef T unwrapped_jvm_type;
     static const bool is_primitive = true;
+    static const bool needs_generation = false;
 
+    typedef runtime_type_desc_ptr rttd_type;
+};
+
+struct jvm_struct_type_traits
+{
+    typedef jobject_ptr jvm_type;
+    typedef jobject unwrapped_jvm_type;
+    static const bool is_primitive = false;
+
+    typedef struct_runtime_type_desc_ptr rttd_type;
+};
+
+struct jvm_builtin_type_traits
+    : jvm_struct_type_traits
+{
     static const bool needs_generation = false;
 };
 
-template<typename T>
-struct jvm_struct_type_traits
+struct jvm_user_type_traits
+    : jvm_struct_type_traits
 {
-	typedef jobject_ptr jvm_type;
-    typedef jobject unwrapped_jvm_type;
-    static const bool is_primitive = false;
+    static const bool needs_generation = true;
 };
 
 template<typename T>
@@ -108,6 +122,13 @@ using enable_if_primitive_t = std::enable_if_t<jvm_type_traits<T>::is_primitive>
 
 template<typename T>
 using enable_if_not_primitive_t = std::enable_if_t<!jvm_type_traits<T>::is_primitive>;
+
+template<typename T>
+using rttd_t = typename jvm_type_traits<T>::rttd_type;
+
+template<typename T>
+rttd_t<T> get_rttd();
+
 
 
 jobject_ptr wrap(jobject p);
@@ -126,6 +147,62 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 {
     return val;
 }
+
+
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_TRAITS(cpp_type) \
+    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_primitive_type_traits<cpp_type> {};
+
+#define JVM_INTEROP_DECLARE_BUILTIN_TYPE_TRAITS(cpp_type) \
+    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_builtin_type_traits> {};
+
+#define JVM_INTEROP_DECLARE_USER_TYPE_TRAITS(cpp_type) \
+    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_user_type_traits> {};
+
+
+
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name) \
+    runtime_type_desc_ptr get_rttd<cpp_type>() \
+	{ \
+		static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
+		return p; \
+	} 
+
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_BASE(cpp_type, java_name, sig) \
+    JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_TRAITS(cpp_type) \
+    runtime_type_desc_ptr get_rttd<cpp_type>() \
+	{ \
+		static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
+		return p; \
+	} 
+
+#define JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_BUILTIN_TYPE_TRAITS(cpp_type) \
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name)
+
+
+#define JVM_INTEROP_DECLARE_USER_TYPE_BASE(cpp_type, dot_separated_name, generated_name) \
+    JVM_INTEROP_DECLARE_USER_TYPE_TRAITS(cpp_type) \
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name) \
+    runtime_type_desc_ptr get_generated_rttd<cpp_type>() \
+	{ \
+		static const auto p = jvm_interop::create_struct_runtime_type_desc(generated_name); \
+		return p; \
+	} 
+
+
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
+    JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_BASE(cpp_type, java_name, sig) \
+    JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(optional<cpp_type>, boxed_name, boxed_name)
+
+
+#define JVM_INTEROP_DECLARE_BUILTIN_TYPE(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(optional<cpp_type>, dot_separated_name) 
+
+
+#define JVM_INTEROP_DECLARE_USER_TYPE(cpp_type, dot_separated_name, generated_name) \
+    JVM_INTEROP_DECLARE_USER_TYPE_BASE()
+
 
 #define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
 	template<> \
