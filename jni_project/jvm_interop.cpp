@@ -6,13 +6,56 @@ namespace jvm_interop
 
 namespace
 {
-	struct java_vm_t
+    struct java_vm_t
 	{
 		java_vm_t()
 		{
 			JavaVMOption jvmopt[1];
             //jvmopt[0].optionString = R"(-Djava.class.path=C:\Program Files\Java\jdk1.8.0_121\jre\lib\charsets.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\deploy.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\access-bridge-64.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\cldrdata.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\dnsns.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\jaccess.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\jfxrt.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\localedata.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\nashorn.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\sunec.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\sunjce_provider.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\sunmscapi.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\sunpkcs11.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\ext\zipfs.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\javaws.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\jce.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\jfr.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\jfxswt.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\jsse.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\management-agent.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\plugin.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\resources.jar;C:\Program Files\Java\jdk1.8.0_121\jre\lib\rt.jar;C:\my\jni_project\out;C:\my\jni_project\lib\kotlin-runtime.jar;C:\my\jni_project\lib\kotlin-reflect.jar)";
-            jvmopt[0].optionString = R"(-Djava.class.path=../out)";
+
+            fs::path root_path = "..";
+            fs::path jdk_path = std::getenv("JDK_PATH");
+
+            vector<fs::path> class_paths = {
+                root_path / "out",
+                root_path / "lib/kotlin-reflect.jar",
+                root_path / "lib/kotlin-runtime.jar",
+                root_path / "lib/kotlin-runtime-sources.jar",
+                jdk_path / "jre/lib/charsets.jar"            ,
+                jdk_path / "jre/lib/deploy.jar"              ,
+                jdk_path / "jre/lib/ext/access-bridge-64.jar",
+                jdk_path / "jre/lib/ext/cldrdata.jar"        ,
+                jdk_path / "jre/lib/ext/dnsns.jar"           ,
+                jdk_path / "jre/lib/ext/jaccess.jar"         ,
+                jdk_path / "jre/lib/ext/jfxrt.jar"           ,
+                jdk_path / "jre/lib/ext/localedata.jar"      ,
+                jdk_path / "jre/lib/ext/nashorn.jar"         ,
+                jdk_path / "jre/lib/ext/sunec.jar"           ,
+                jdk_path / "jre/lib/ext/sunjce_provider.jar" ,
+                jdk_path / "jre/lib/ext/sunmscapi.jar"       ,
+                jdk_path / "jre/lib/ext/sunpkcs11.jar"       ,
+                jdk_path / "jre/lib/ext/zipfs.jar"           ,
+                jdk_path / "jre/lib/javaws.jar"              ,
+                jdk_path / "jre/lib/jce.jar"                 ,
+                jdk_path / "jre/lib/jfr.jar"                 ,
+                jdk_path / "jre/lib/jfxswt.jar"              ,
+                jdk_path / "jre/lib/jsse.jar"                ,
+                jdk_path / "jre/lib/management-agent.jar"    ,
+                jdk_path / "jre/lib/plugin.jar"              ,
+                jdk_path / "jre/lib/resources.jar"           ,
+                jdk_path / "jre/lib/rt.jar"                  ,
+            };
+
+            vector<string> class_paths_str;
+            std::transform(class_paths.begin(), class_paths.end(), std::back_inserter(class_paths_str),
+                [](fs::path const &p)
+            {
+                return p.string();
+            });
+
+            string joined_class_paths = "-Djava.class.path=" + boost::algorithm::join(class_paths_str, ";");
+
+            jvmopt[0].optionString = const_cast<char*>(joined_class_paths.c_str());
             jvmopt[0].extraInfo = nullptr;
             
 			JavaVMInitArgs vmArgs;

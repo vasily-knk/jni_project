@@ -42,8 +42,24 @@ struct bar
     }
 };
 
+struct vec2d_t
+{
+    float x = 0.f;
+    float y = 0.f;
+
+    template<typename Proc>
+    friend void reflect(Proc &proc, vec2d_t const &const_val)
+    {
+        auto &val = const_cast<vec2d_t &>(const_val);
+
+        proc(val.x, "x");
+        proc(val.y, "y");
+    }
+};
+
 JVM_INTEROP_DECLARE_USER_TYPE(bar, "org.vasya.Bar")
 JVM_INTEROP_DECLARE_USER_TYPE(baz, "org.vasya.Baz")
+JVM_INTEROP_DECLARE_USER_TYPE_EXT(vec2d_t, "org.vasya.Vec2d", "org.vasya.Vec2dBase")
 
 
 //void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)
@@ -144,7 +160,8 @@ int amain(int argc, char **argv)
 	try
 	{
         struct_fields_map_t fields_map;
-	    //append_struct_fields(b, fields_map);
+	    append_struct_fields<bar>(fields_map);
+        append_struct_fields<vec2d_t>(fields_map);
 
         generate_java_structs(fields_map, "../src");
 //
@@ -180,6 +197,7 @@ void generate()
 
     struct_fields_map_t fields_map;
     append_struct_fields<bar>(fields_map);
+    append_struct_fields<vec2d_t>(fields_map);
 
     generate_java_structs(fields_map, "../src");
 }
@@ -223,6 +241,6 @@ void interop()
 
 int main(int argc, char **argv)
 {
-    //generate();
-    interop();
+    generate();
+    //interop();
 }

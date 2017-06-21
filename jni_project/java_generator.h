@@ -69,7 +69,7 @@ namespace jvm_interop
         template<typename T>
         void process_struct_type(std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
         {
-            auto desc = get_type_desc<T>();
+            auto desc = get_generated_type_desc<T>();
 
             string const &java_name = desc->java_name();
             if (dst_.count(java_name) == 0)
@@ -95,7 +95,7 @@ namespace jvm_interop
     template<typename T>
     void append_struct_fields(struct_fields_map_t &dst)
     {
-        auto desc = get_type_desc<T>();
+        auto desc = get_generated_type_desc<T>();
 
         append_struct_fields_processor proc(desc, dst);
 
