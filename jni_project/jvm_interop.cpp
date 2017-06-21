@@ -133,7 +133,7 @@ namespace detail
     {
 	    auto env = env_instance();
         
-        check_struct_jvm2cpp(src, jvm_type_traits<string>::get_runtime_desc());
+        check_struct_jvm2cpp(src, get_type_desc<string>());
 
 	    auto src_str = static_cast<jstring>(src->get_p());
 

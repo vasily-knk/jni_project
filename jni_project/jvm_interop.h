@@ -118,6 +118,12 @@ struct jvm_user_type_traits
 };
 
 template<typename T>
+typename jvm_type_traits<T>::rttd_type get_type_desc();
+
+template<typename T>
+typename jvm_type_traits<T>::rttd_type get_generated_type_desc();
+
+template<typename T>
 using enable_if_primitive_t = std::enable_if_t<jvm_type_traits<T>::is_primitive>;
 
 template<typename T>
@@ -150,104 +156,142 @@ T unwrap(T val, enable_if_primitive_t<T> * = nullptr)
 
 
 #define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_TRAITS(cpp_type) \
-    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_primitive_type_traits<cpp_type> {};
+    template<> struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_primitive_type_traits<cpp_type> {};
 
 #define JVM_INTEROP_DECLARE_BUILTIN_TYPE_TRAITS(cpp_type) \
-    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_builtin_type_traits> {};
+    template<> struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_builtin_type_traits {};
 
 #define JVM_INTEROP_DECLARE_USER_TYPE_TRAITS(cpp_type) \
-    struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_user_type_traits> {};
+    template<> struct jvm_interop::jvm_type_traits<cpp_type> : jvm_interop::jvm_user_type_traits {};
 
 
 
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name) \
-    runtime_type_desc_ptr get_rttd<cpp_type>() \
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_DESC(cpp_type, java_name, sig) \
+    template<> \
+    inline jvm_interop::runtime_type_desc_ptr jvm_interop::get_type_desc<cpp_type>() \
+	{ \
+		static const auto p = jvm_interop::create_primitive_runtime_type_desc(java_name, sig); \
+		return p; \
+	} 
+
+#define JVM_INTEROP_DECLARE_STRUCT_TYPE_DESC(cpp_type, dot_separated_name) \
+    template<> \
+    inline jvm_interop::struct_runtime_type_desc_ptr jvm_interop::get_type_desc<cpp_type>() \
 	{ \
 		static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
 		return p; \
 	} 
 
-#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_BASE(cpp_type, java_name, sig) \
-    JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_TRAITS(cpp_type) \
-    runtime_type_desc_ptr get_rttd<cpp_type>() \
+#define JVM_INTEROP_DECLARE_GENERATED_TYPE_DESC(cpp_type, dot_separated_name) \
+    template<> \
+    inline jvm_interop::struct_runtime_type_desc_ptr jvm_interop::get_generated_type_desc<cpp_type>() \
 	{ \
-		static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
+		static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
 		return p; \
 	} 
+
+
+    
+#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_BASE(cpp_type, java_name, sig) \
+    JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_TRAITS(cpp_type) \
+    JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_DESC(cpp_type, java_name, sig)
 
 #define JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(cpp_type, dot_separated_name) \
     JVM_INTEROP_DECLARE_BUILTIN_TYPE_TRAITS(cpp_type) \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name)
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_DESC(cpp_type, dot_separated_name)
 
-
-#define JVM_INTEROP_DECLARE_USER_TYPE_BASE(cpp_type, dot_separated_name, generated_name) \
+#define JVM_INTEROP_DECLARE_USER_TYPE_BASE(cpp_type, dot_separated_name, generated_dot_separated_name) \
     JVM_INTEROP_DECLARE_USER_TYPE_TRAITS(cpp_type) \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_RTTD(cpp_type, dot_separated_name) \
-    runtime_type_desc_ptr get_generated_rttd<cpp_type>() \
-	{ \
-		static const auto p = jvm_interop::create_struct_runtime_type_desc(generated_name); \
-		return p; \
-	} 
+    JVM_INTEROP_DECLARE_STRUCT_TYPE_DESC(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_GENERATED_TYPE_DESC(cpp_type, generated_dot_separated_name) 
+
 
 
 #define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
     JVM_INTEROP_DECLARE_PRIMITIVE_TYPE_BASE(cpp_type, java_name, sig) \
-    JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(optional<cpp_type>, boxed_name, boxed_name)
-
+    JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(optional<cpp_type>, boxed_name)
 
 #define JVM_INTEROP_DECLARE_BUILTIN_TYPE(cpp_type, dot_separated_name) \
     JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(cpp_type, dot_separated_name) \
     JVM_INTEROP_DECLARE_BUILTIN_TYPE_BASE(optional<cpp_type>, dot_separated_name) 
 
 
-#define JVM_INTEROP_DECLARE_USER_TYPE(cpp_type, dot_separated_name, generated_name) \
-    JVM_INTEROP_DECLARE_USER_TYPE_BASE()
+#define JVM_INTEROP_DECLARE_USER_TYPE_EXT(cpp_type, dot_separated_name, generated_dot_separated_name) \
+    JVM_INTEROP_DECLARE_USER_TYPE_BASE(cpp_type, dot_separated_name, generated_dot_separated_name) \
+    JVM_INTEROP_DECLARE_USER_TYPE_BASE(optional<cpp_type>, dot_separated_name, generated_dot_separated_name) 
 
-
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
-	template<> \
-	struct jvm_interop::jvm_type_traits<cpp_type> \
-		: jvm_interop::jvm_struct_type_traits<cpp_type> \
-	{ \
-		static jvm_interop::struct_runtime_type_desc_ptr get_runtime_desc() \
-		{ \
-			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
-			return p; \
-		} \
-        static const bool needs_generation = needs_generation_flag; \
-    };
-
-#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
-	template<> \
-	struct jvm_interop::jvm_type_traits<cpp_type> \
-		: jvm_interop::jvm_primitive_type_traits<cpp_type> \
-	{ \
-		static jvm_interop::runtime_type_desc_ptr get_runtime_desc() \
-		{ \
-			static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
-			return p; \
-		} \
-	}; \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<cpp_type>, boxed_name, false) 
-
-
-
+#define JVM_INTEROP_DECLARE_USER_TYPE(cpp_type, dot_separated_name) \
+    JVM_INTEROP_DECLARE_USER_TYPE_EXT(cpp_type, dot_separated_name, dot_separated_name)
     
-#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, needs_generation_flag) \
-    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
-	template<> \
-	struct jvm_interop::jvm_type_traits<optional<cpp_type>> \
-        : jvm_interop::jvm_type_traits<cpp_type> {};
+//
+//
+//#define JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
+//	template<> \
+//	struct jvm_interop::jvm_type_traits<cpp_type> \
+//		: jvm_interop::jvm_struct_type_traits<cpp_type> \
+//	{ \
+//		static jvm_interop::struct_runtime_type_desc_ptr get_runtime_desc() \
+//		{ \
+//			static const auto p = jvm_interop::create_struct_runtime_type_desc(dot_separated_name); \
+//			return p; \
+//		} \
+//        static const bool needs_generation = needs_generation_flag; \
+//    };
+//
+//#define JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(cpp_type, java_name, sig, boxed_name) \
+//	template<> \
+//	struct jvm_interop::jvm_type_traits<cpp_type> \
+//		: jvm_interop::jvm_primitive_type_traits<cpp_type> \
+//	{ \
+//		static jvm_interop::runtime_type_desc_ptr get_runtime_desc() \
+//		{ \
+//			static const auto p = jvm_interop::create_primitive_runtime_type_desc((java_name), (sig)); \
+//			return p; \
+//		} \
+//	}; \
+//    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(optional<cpp_type>, boxed_name, false) 
+//
+//
+//
+//    
+//#define JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, needs_generation_flag) \
+//    JVM_INTEROP_DECLARE_STRUCT_TYPE_NO_OPTIONAL(cpp_type, dot_separated_name, needs_generation_flag) \
+//	template<> \
+//	struct jvm_interop::jvm_type_traits<optional<cpp_type>> \
+//        : jvm_interop::jvm_type_traits<cpp_type> {};
+//
+//
+//#define JVM_INTEROP_DECLARE_BUILTIN_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, false) 
+//  
+//#define JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, true) 
+//
 
 
-#define JVM_INTEROP_DECLARE_BUILTIN_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, false) 
-  
-#define JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(cpp_type, dot_separated_name) JVM_INTEROP_DECLARE_STRUCT_TYPE(cpp_type, dot_separated_name, true) 
 
+//template<> struct jvm_interop::jvm_type_traits<jboolean> 
+//    : jvm_interop::jvm_primitive_type_traits<jboolean> {}; 
+//    
+//template<>
+//runtime_type_desc_ptr get_type_desc<jboolean>() 
+//{ 
+//    static const auto p = jvm_interop::create_primitive_runtime_type_desc("boolean", 'Z'); 
+//    return p; 
+//} 
+//    
+//template<> struct jvm_interop::jvm_type_traits<optional<jboolean>> 
+//    : jvm_interop::jvm_builtin_type_traits {};
+//    
+//template<>
+//struct_runtime_type_desc_ptr get_type_desc<optional<jboolean>>()
+//{ 
+//    static const auto p = jvm_interop::create_struct_runtime_type_desc("java.lang.Boolean"); 
+//    return p; 
+//}
+//
+//
 
-
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jboolean, "boolean", 'Z', "java.lang.Boolean") 
-JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jbyte   , "byte"   , 'B', "java.lang.Byte") 
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jboolean, "boolean", 'Z', "java.lang.Boolean")
+JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jbyte   , "byte"   , 'B', "java.lang.Byte")
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jchar   , "char"   , 'C', "java.lang.Char") 
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jdouble , "double" , 'D', "java.lang.Double") 
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jfloat  , "float"  , 'F', "java.lang.Float") 
@@ -256,15 +300,7 @@ JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jlong   , "long"   , 'J', "java.lang.Long")
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(jshort  , "short"  , 'S', "java.lang.Short") 
 JVM_INTEROP_DECLARE_PRIMITIVE_TYPE(void    , "void"   , 'V', "java.lang.Void") 
 
-JVM_INTEROP_DECLARE_BUILTIN_STRUCT_TYPE(string, "java.lang.String")
-
-
-template<typename T>
-runtime_type_desc_ptr get_runtime_type_desc()
-{
-	return jvm_type_traits<T>::get_runtime_desc();
-}
-
+JVM_INTEROP_DECLARE_BUILTIN_TYPE(string, "java.lang.String")
 
 
 template<typename T>
@@ -302,7 +338,7 @@ namespace detail
         template<typename T>
         void operator()(T const &field_src, char const *name) 
         {
-            auto field_desc = jvm_type_traits<T>::get_runtime_desc();
+            auto field_desc = get_type_desc<T>();
             jmethodID setter = desc_->setter(name, field_desc);
 
             call_method<void>(dst_, setter, field_src);
@@ -324,7 +360,7 @@ namespace detail
         template<typename T>
         void operator()(T &field_dst, char const *name)
         {
-            auto field_desc = jvm_type_traits<T>::get_runtime_desc();
+            auto field_desc = get_type_desc<T>();
             jmethodID getter = desc_->getter(name, field_desc);
 
             field_dst = call_method<T>(src_, getter);
@@ -346,9 +382,8 @@ T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
 template<typename T>
 jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
 {
-	typedef jvm_type_traits<T> traits;
+    struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
-	struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
     jobject_ptr obj = runtime_desc->create();
 
     detail::cpp2jvm_processor_t proc(runtime_desc, obj);
@@ -363,7 +398,7 @@ jobject_ptr cpp2jvm(optional<T> const &src, enable_if_primitive_t<T> * = nullptr
     if (!src)
         return wrap_null();
 
-    struct_runtime_type_desc_ptr runtime_desc = jvm_type_traits<optional<T>>::get_runtime_desc();
+    struct_runtime_type_desc_ptr runtime_desc = get_type_desc<optional<T>>();
     //return runtime_desc->create();
 
     auto sig = make_method_signature<void, T>();
@@ -403,8 +438,7 @@ namespace detail
     template<typename T>
     void jvm2cpp_impl(jobject_ptr src, T &dst, enable_if_not_primitive_t<T> * = nullptr)
 	{
-        typedef jvm_type_traits<T> traits;
-        struct_runtime_type_desc_ptr runtime_desc = traits::get_runtime_desc();
+        struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
         check_struct_jvm2cpp(src, runtime_desc);
 
@@ -421,11 +455,11 @@ namespace detail
             return;
         }
 
-        struct_runtime_type_desc_ptr runtime_desc = jvm_type_traits<optional<T>>::get_runtime_desc();
+        struct_runtime_type_desc_ptr runtime_desc = get_type_desc<optional<T>>();
 
         auto sig = make_method_signature<T>();
 
-        string name = jvm_type_traits<T>::get_runtime_desc()->java_name() + "Value";
+        string name = get_type_desc<T>()->java_name() + "Value";
 
         auto m = runtime_desc->find_method(name.c_str(), sig);
 
@@ -465,8 +499,8 @@ template<typename Ret, typename... Args>
 string make_method_signature()
 {
     return make_method_signature(
-        jvm_type_traits<Ret>::get_runtime_desc(),
-        { jvm_type_traits<Args>::get_runtime_desc()... }
+        get_type_desc<Ret>(),
+        { get_type_desc<Args>()... }
     );
 }
 

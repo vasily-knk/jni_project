@@ -42,8 +42,8 @@ struct bar
     }
 };
 
-JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(bar, "org.vasya.Bar")
-JVM_INTEROP_DECLARE_USER_STRUCT_TYPE(baz, "org.vasya.Baz")
+JVM_INTEROP_DECLARE_USER_TYPE(bar, "org.vasya.Bar")
+JVM_INTEROP_DECLARE_USER_TYPE(baz, "org.vasya.Baz")
 
 
 //void JNICALL foo(JNIEnv *env, jobject obj, int32_t val)

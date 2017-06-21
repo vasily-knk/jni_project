@@ -70,7 +70,7 @@ namespace jvm_interop
 
 		jmethodID setter(char const* field_name, runtime_type_desc_ptr runtime_type_desc) override
 		{
-			auto sig = make_method_signature(get_runtime_type_desc<void>(), { runtime_type_desc });
+			auto sig = make_method_signature(get_type_desc<void>(), { runtime_type_desc });
 
 			return find_method(make_setter_name(field_name), sig);
 		}
