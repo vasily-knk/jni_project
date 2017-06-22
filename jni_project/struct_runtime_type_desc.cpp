@@ -89,7 +89,6 @@ namespace jvm_interop
         }
 
     private:
-
 		jclass get_jclass() const
 		{
 			if (clazz_)

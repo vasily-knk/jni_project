@@ -48,10 +48,12 @@ typedef shared_ptr<jobject_wrapper> jobject_ptr;
 
 
 struct runtime_type_desc	   ;
+struct non_primitive_type_desc;
 struct struct_runtime_type_desc;
 
 
 typedef shared_ptr<runtime_type_desc> runtime_type_desc_ptr;
+typedef shared_ptr<non_primitive_type_desc> non_primitive_type_desc_ptr;
 typedef shared_ptr<struct_runtime_type_desc> struct_runtime_type_desc_ptr;
 
 struct runtime_type_desc
@@ -62,12 +64,17 @@ struct runtime_type_desc
 	virtual string const &java_name() = 0;
 };
 
-struct struct_runtime_type_desc
-	: runtime_type_desc
+struct non_primitive_type_desc
+    : runtime_type_desc
 {
-	virtual string const &lookup_name() = 0;
-	virtual jobject_ptr create() = 0;
-	virtual jclass get_class() = 0;
+    virtual string const &lookup_name() = 0;
+    virtual jclass get_class() = 0;
+};
+
+struct struct_runtime_type_desc
+	: non_primitive_type_desc
+{
+    virtual jobject_ptr create() = 0;
 
 	virtual jmethodID getter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
 	virtual jmethodID setter(char const *field_name, runtime_type_desc_ptr runtime_type_desc) = 0;
@@ -79,7 +86,7 @@ struct struct_runtime_type_desc
 
 
 runtime_type_desc_ptr create_primitive_runtime_type_desc(char const *java_name, char sig);
-runtime_type_desc_ptr create_array_runtime_type_desc(runtime_type_desc_ptr item_desc);
+non_primitive_type_desc_ptr create_array_runtime_type_desc(runtime_type_desc_ptr item_desc);
 struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name);
 
 template<typename T, typename Enable = void>
@@ -289,11 +296,11 @@ struct jvm_type_traits<Arr, std::enable_if_t<is_array<Arr>::value>>
     static const bool is_primitive = false;
     static const bool needs_generation = jvm_type_traits<value_type>::needs_generation;
 
-    typedef runtime_type_desc_ptr rttd_type;
+    typedef non_primitive_type_desc_ptr rttd_type;
 
-    static runtime_type_desc_ptr get_explicit_type_desc()
+    static rttd_type get_explicit_type_desc()
     {
-        static runtime_type_desc_ptr p = create_array_runtime_type_desc(get_type_desc<value_type>());
+        static rttd_type p = create_array_runtime_type_desc(get_type_desc<value_type>());
         return p;
     }
 
@@ -385,8 +392,53 @@ namespace detail
         jobject_ptr src_;
     };
 
+
+    template<typename T>
+    struct jni_array_creator_traits;
+//    void SetLongArrayRegion(jlongArray array, jsize start, jsize len,
+//        const jlong *buf) {
+
+#define JVM_INTEROP_DEFINE_ARRAY_CREATOR(type, Type)                            \
+    template<>                                                                  \
+    struct jni_array_creator_traits<type>                                       \
+    {                                                                           \
+        typedef type ret_type;                                                  \
+        using array_type = type ## Array;                                       \
+        using array_creator_fn = array_type(JNIEnv::*)(jsize);                  \
+        using region_setter_fn = void(JNIEnv::*)(array_type, jsize, jsize, ret_type const *); \
+                                                                                \
+        static array_creator_fn get_array_creator()                             \
+        {                                                                       \
+            return &JNIEnv::New ## Type ## Array;                               \
+        }                                                                       \
+                                                                                \
+        static region_setter_fn get_region_setter()                             \
+        {                                                                       \
+            return &JNIEnv::Set ## Type ## ArrayRegion;                         \
+        }                                                                       \
+    };
+
+
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jboolean, Boolean)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jbyte, Byte)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jchar, Char)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jdouble, Double)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jfloat, Float)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jint, Int)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jlong, Long)
+    JVM_INTEROP_DEFINE_ARRAY_CREATOR(jshort, Short)
+
+
+#undef JVM_INTEROP_DEFINE_ARRAY_CREATOR    
+
 } // namespace detail
 
+
+
+
+
+
+    
 template<typename T>
 T cpp2jvm(T src, std::enable_if_t<!is_array<T>::value && jvm_type_traits<T>::is_primitive> * = nullptr)
 {
@@ -435,13 +487,25 @@ jobject_ptr cpp2jvm(optional<T> const &src, enable_if_not_primitive_t<T> * = nul
 template<typename T>
 jobject_ptr cpp2jvm_array(T const &src, enable_if_primitive_t<typename T::value_type> * = nullptr)
 {
-    return wrap_null();
+    typedef typename T::value_type value_type;
+    
+    auto creator = detail::jni_array_creator_traits<value_type>::get_array_creator();
+    auto region_setter = detail::jni_array_creator_traits<value_type>::get_region_setter();
+
+    jsize sz = jsize(src.size());
+
+    auto env = env_instance();
+    
+    auto dst = std::invoke(creator, env, sz);
+    std::invoke(region_setter, env, dst, 0, sz, src.data());
+    
+    return wrap(dst);
 }
 
 template<typename T>
 jobject_ptr cpp2jvm_array(T const &src, enable_if_not_primitive_t<typename T::value_type> * = nullptr)
 {
-    struct_runtime_type_desc_ptr desc = get_type_desc<typename T::value_type>();
+    auto desc = get_type_desc<typename T::value_type>();
     
     jsize sz(src.size());
 
@@ -559,9 +623,8 @@ namespace detail
     struct method_caller;
 
 
-
-template<typename T>
-struct jni_method_caller_traits;
+    template<typename T>
+    struct jni_method_caller_traits;
 
 #define JVM_INTEROP_DEFINE_METHOD_CALLER(type, Type)                            \
     template<>                                                                  \
@@ -585,18 +648,19 @@ struct jni_method_caller_traits;
 
 
 
-JVM_INTEROP_DEFINE_METHOD_CALLER(jboolean, Boolean)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jbyte   , Byte)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jchar   , Char)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jdouble , Double)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jfloat  , Float)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jint    , Int)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jlong   , Long)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jshort  , Short)
-JVM_INTEROP_DEFINE_METHOD_CALLER(jobject , Object)
-JVM_INTEROP_DEFINE_METHOD_CALLER(void, Void)
+    JVM_INTEROP_DEFINE_METHOD_CALLER(jboolean, Boolean)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jbyte, Byte)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jchar, Char)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jdouble, Double)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jfloat, Float)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jint, Int)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jlong, Long)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jshort, Short)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(jobject, Object)
+        JVM_INTEROP_DEFINE_METHOD_CALLER(void, Void)
 
-#undef JVM_INTEROP_DEFINE_METHOD_CALLER
+#undef JVM_INTEROP_DEFINE_METHOD_CALLER    
+
    
 
 template<typename T, typename... Args>

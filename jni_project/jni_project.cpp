@@ -235,10 +235,16 @@ void interop()
         //
         //b2 = sm(b);
 
-        auto sm = get_static_method<void, vector<string>>(demo_jclass, "printStrings");
+        auto sm = get_static_method<void, vector<vector<string>>>(demo_jclass, "printStrings");
 
-        sm({ "Hello", "beautiful", "world" });
+        sm({
+            { "Hello", "beautiful", "world" },
+            { "Fuck", "ugly", "girls", "for", "money" },
+        });
 
+        auto sm2 = get_static_method<void, vector<jint>>(demo_jclass, "printInts");
+
+        sm2({ 1, 29, 344, -3, 0, 7 });
 
     }
     catch (jvm_interop_error const &e)

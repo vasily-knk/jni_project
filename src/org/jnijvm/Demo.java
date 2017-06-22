@@ -19,10 +19,20 @@ public class Demo {
         return Fucker.fuckBar(src);
     }
 
-    public static void printStrings(String[] strs) {
-        for (String str : strs)
-            System.out.println(str);
+    public static void printStrings(String[][] strss) {
+        for (String[] strs : strss) {
+            System.out.println();
+            System.out.println("-- Pack:");
+            for (String str : strs)
+                System.out.println(str);
+        }
     }
+
+    public static void printInts(int[] ints) {
+        for (int i : ints)
+            System.out.println("Int: " + i);
+    }
+
 
 
     public static void main(String[] args)
