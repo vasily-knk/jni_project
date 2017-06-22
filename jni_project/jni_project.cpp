@@ -27,7 +27,8 @@ struct bar
 
     //baz bz;
     optional<baz> obz;
-
+    vector<baz> i_arr;
+                      
     template<typename Proc>
     friend void reflect(Proc &proc, bar const &const_val)
     {
@@ -39,6 +40,7 @@ struct bar
         proc(val.ostr, "ostr");
         //proc(val.bz, "bz");
         proc(val.obz, "obz");
+        proc(val.i_arr, "i_arr");
     }
 };
 
@@ -243,4 +245,5 @@ int main(int argc, char **argv)
 {
     generate();
     //interop();
+    return 0;
 }

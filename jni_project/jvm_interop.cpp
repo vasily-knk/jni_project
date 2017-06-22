@@ -4,6 +4,7 @@
 namespace jvm_interop
 {
 
+
 namespace
 {
     struct java_vm_t
@@ -18,9 +19,9 @@ namespace
 
             vector<fs::path> class_paths = {
                 root_path / "out",
-                root_path / "lib/kotlin-reflect.jar",
-                root_path / "lib/kotlin-runtime.jar",
-                root_path / "lib/kotlin-runtime-sources.jar",
+//                root_path / "lib/kotlin-reflect.jar",
+//                root_path / "lib/kotlin-runtime.jar",
+//                root_path / "lib/kotlin-runtime-sources.jar",
                 jdk_path / "jre/lib/charsets.jar"            ,
                 jdk_path / "jre/lib/deploy.jar"              ,
                 jdk_path / "jre/lib/ext/access-bridge-64.jar",
@@ -44,6 +45,8 @@ namespace
                 jdk_path / "jre/lib/plugin.jar"              ,
                 jdk_path / "jre/lib/resources.jar"           ,
                 jdk_path / "jre/lib/rt.jar"                  ,
+                "C:/Users/vasya/.IdeaIC2016.3/config/plugins/Kotlin/kotlinc/lib/kotlin-reflect.jar",
+                "C:/Users/vasya/.IdeaIC2016.3/config/plugins/Kotlin/kotlinc/lib/kotlin-runtime.jar",
             };
 
             vector<string> class_paths_str;

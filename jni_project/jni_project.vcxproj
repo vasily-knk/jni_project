@@ -160,10 +160,12 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="array_runtime_type_desc.cpp" />
     <ClCompile Include="java_generator.cpp" />
     <ClCompile Include="jni_project.cpp" />
     <ClCompile Include="jvm_interop.cpp" />
     <ClCompile Include="primitive_runtime_type_desc.cpp" />
+    <ClCompile Include="static_checks.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

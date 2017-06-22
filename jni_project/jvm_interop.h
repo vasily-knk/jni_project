@@ -79,6 +79,7 @@ struct struct_runtime_type_desc
 
 
 runtime_type_desc_ptr create_primitive_runtime_type_desc(char const *java_name, char sig);
+runtime_type_desc_ptr create_array_runtime_type_desc(runtime_type_desc_ptr item_desc);
 struct_runtime_type_desc_ptr create_struct_runtime_type_desc(char const *dot_separated_name);
 
 template<typename T, typename Enable = void>
@@ -124,7 +125,11 @@ typename jvm_type_traits<T>::rttd_type get_type_desc()
 }
 
 template<typename T>
-typename jvm_type_traits<T>::rttd_type get_generated_type_desc();
+std::enable_if_t<jvm_type_traits<T>::needs_generation, struct_runtime_type_desc_ptr>
+get_generated_type_desc()
+{
+    return jvm_type_traits<T>::get_explicit_generated_type_desc();
+}
 
 template<typename T>
 using enable_if_primitive_t = std::enable_if_t<jvm_type_traits<T>::is_primitive>;
@@ -253,9 +258,48 @@ template<typename T>
 struct jvm_type_traits<optional<T>, enable_if_not_primitive_t<T>>
     : jvm_type_traits<T>
 {
-    static struct_runtime_type_desc_ptr get_explicit_type_desc()
+    typedef typename jvm_type_traits<T>::rttd_type rttd_type;
+    
+    static rttd_type get_explicit_type_desc()
     {
         return get_type_desc<T>();
+    }
+};
+
+
+// array
+
+template<typename T>
+struct is_array
+    : std::integral_constant<bool, false>
+{};
+
+template<typename T>
+struct is_array<vector<T>>
+    : std::integral_constant<bool, true>
+{};
+
+template<typename Arr>
+struct jvm_type_traits<Arr, std::enable_if_t<is_array<Arr>::value>>
+{
+    typedef typename Arr::value_type value_type;
+
+    typedef jobject_ptr jvm_type;
+    typedef jobject unwrapped_jvm_type;
+    static const bool is_primitive = false;
+    static const bool needs_generation = jvm_type_traits<value_type>::needs_generation;
+
+    typedef runtime_type_desc_ptr rttd_type;
+
+    static runtime_type_desc_ptr get_explicit_type_desc()
+    {
+        static runtime_type_desc_ptr p = create_array_runtime_type_desc(get_type_desc<value_type>());
+        return p;
+    }
+
+    static struct_runtime_type_desc_ptr get_explicit_generated_type_desc()
+    {
+        return get_generated_type_desc<value_type>();
     }
 };
 
@@ -344,13 +388,13 @@ namespace detail
 } // namespace detail
 
 template<typename T>
-T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
+T cpp2jvm(T src, std::enable_if_t<!is_array<T>::value && jvm_type_traits<T>::is_primitive> * = nullptr)
 {
 	return src;
 }
 
 template<typename T>
-jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
+jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!is_array<T>::value && !jvm_type_traits<T>::is_primitive> * = nullptr)
 {
     struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
@@ -388,6 +432,14 @@ jobject_ptr cpp2jvm(optional<T> const &src, enable_if_not_primitive_t<T> * = nul
     return cpp2jvm(*src);
 }
 
+
+template<typename Arr>
+jobject_ptr cpp2jvm(Arr const &src, std::enable_if_t<is_array<Arr>::value> * = nullptr)
+{
+    return wrap_null();
+}
+
+
 jobject_ptr cpp2jvm(string const &src);
 
 template<typename T>
@@ -406,7 +458,7 @@ namespace detail
 	}
 
     template<typename T>
-    void jvm2cpp_impl(jobject_ptr src, T &dst, enable_if_not_primitive_t<T> * = nullptr)
+    void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<!is_array<T>::value && !jvm_type_traits<T>::is_primitive> * = nullptr)
 	{
         struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
@@ -448,7 +500,10 @@ namespace detail
         dst = jvm2cpp<T>(src);
     }
 
-	
+    template<typename Arr>
+    void jvm2cpp_impl(jobject_ptr src, Arr &dst, std::enable_if_t<is_array<Arr>::value> * = nullptr)
+    {}
+
     void jvm2cpp_impl(jobject_ptr src, string &dst);
 } // namespace detail
 
