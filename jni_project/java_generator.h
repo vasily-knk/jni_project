@@ -58,18 +58,18 @@ namespace jvm_interop
         template<typename T>
         void process_type(enable_if_not_primitive_t<T> * = nullptr) const
         {
-            process_struct_type<T>();
+            process_not_primitive_type<T>();
         }
     
     private:
         template<typename T>
-        void process_struct_type(std::enable_if_t<is_array<T>::value> * = nullptr) const
+        void process_not_primitive_type(std::enable_if_t<is_array<T>::value> * = nullptr) const
         {
             process_type<T::value_type>();
         }
 
         template<typename T>
-        void process_struct_type(std::enable_if_t<!is_array<T>::value> * = nullptr) const
+        void process_not_primitive_type(std::enable_if_t<!is_array<T>::value> * = nullptr) const
         {
             process_non_array_type<T>();
         }

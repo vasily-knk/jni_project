@@ -5,7 +5,7 @@ public class Bar {
     protected java.lang.String str;
     protected java.lang.Float of;
     protected java.lang.String ostr;
-    protected org.vasya.Baz obz;
+    protected java.lang.String[] strings;
 
     public int getI() {
         return this.i;
@@ -39,12 +39,12 @@ public class Bar {
         this.ostr = val;
     }
 
-    public org.vasya.Baz getObz() {
-        return this.obz;
+    public java.lang.String[] getStrings() {
+        return this.strings;
     }
 
-    public void setObz(org.vasya.Baz val) {
-        this.obz = val;
+    public void setStrings(java.lang.String[] val) {
+        this.strings = val;
     }
 
 }

@@ -28,6 +28,7 @@ struct bar
     //baz bz;
     //optional<baz> obz;
     vector<baz> i_arr;
+    vector<string> strings;
                       
     template<typename Proc>
     friend void reflect(Proc &proc, bar const &const_val)
@@ -41,6 +42,7 @@ struct bar
         //proc(val.bz, "bz");
         //proc(val.obz, "obz");
         //proc(val.i_arr, "i_arr");
+        proc(val.strings, "strings");
     }
 };
 
@@ -171,14 +173,16 @@ int amain(int argc, char **argv)
         b2 = jvm2cpp<bar>(jb);
 
 
+        jclass demo_jclass = find_class("org/jnijvm/Demo");
+
+
+
         //
 //        auto m = get_method<void, double>(bar_jclass, "doSomething");
 //
 //        m(jb)(256.4);
 //
 //
-//        jclass demo_jclass = find_class("org/jnijvm/Demo");
-//        auto sm = get_static_method<void, string, jint, jfloat>(demo_jclass, "greet");
 //
 //        sm("Vasya", 32, 116.99f);
 
@@ -224,12 +228,16 @@ void interop()
     {
         JNIEnv *env = jvm_interop::env_instance();
 
-        jobject_ptr jb = cpp2jvm(b);
+        //jobject_ptr jb = cpp2jvm(b);
         
         jclass demo_jclass = find_class("org/jnijvm/Demo");
-        auto sm = get_static_method<bar, bar>(demo_jclass, "modifyBar");
+        //auto sm = get_static_method<bar, bar>(demo_jclass, "modifyBar");
+        //
+        //b2 = sm(b);
 
-        b2 = sm(b);
+        auto sm = get_static_method<void, vector<string>>(demo_jclass, "printStrings");
+
+        sm({ "Hello", "beautiful", "world" });
 
 
     }
@@ -244,7 +252,7 @@ void interop()
 
 int main(int argc, char **argv)
 {
-    generate();
-    //interop();
+    //generate();
+    interop();
     return 0;
 }

@@ -19,6 +19,12 @@ public class Demo {
         return Fucker.fuckBar(src);
     }
 
+    public static void printStrings(String[] strs) {
+        for (String str : strs)
+            System.out.println(str);
+    }
+
+
     public static void main(String[] args)
     {
         Bar b = new Bar();

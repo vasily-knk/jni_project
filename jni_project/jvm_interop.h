@@ -432,11 +432,34 @@ jobject_ptr cpp2jvm(optional<T> const &src, enable_if_not_primitive_t<T> * = nul
     return cpp2jvm(*src);
 }
 
-
-template<typename Arr>
-jobject_ptr cpp2jvm(Arr const &src, std::enable_if_t<is_array<Arr>::value> * = nullptr)
+template<typename T>
+jobject_ptr cpp2jvm_array(T const &src, enable_if_primitive_t<typename T::value_type> * = nullptr)
 {
     return wrap_null();
+}
+
+template<typename T>
+jobject_ptr cpp2jvm_array(T const &src, enable_if_not_primitive_t<typename T::value_type> * = nullptr)
+{
+    struct_runtime_type_desc_ptr desc = get_type_desc<typename T::value_type>();
+    
+    jsize sz(src.size());
+
+    auto env = env_instance();
+    auto dst = env->NewObjectArray(sz, desc->get_class(), nullptr);
+    for (jsize i = 0; i < sz; ++i)
+    {
+        jobject_ptr elem = cpp2jvm(src.at(i));
+        env->SetObjectArrayElement(dst, i, unwrap(elem));
+    }
+
+    return wrap(dst);
+}
+
+template<typename T>
+jobject_ptr cpp2jvm(T const &src, std::enable_if_t<is_array<T>::value> * = nullptr)
+{
+    return cpp2jvm_array(src);
 }
 
 
