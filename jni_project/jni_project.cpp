@@ -26,7 +26,7 @@ struct bar
     optional<string> ostr;
 
     //baz bz;
-    optional<baz> obz;
+    //optional<baz> obz;
     vector<baz> i_arr;
                       
     template<typename Proc>
@@ -39,8 +39,8 @@ struct bar
         proc(val.of, "of");
         proc(val.ostr, "ostr");
         //proc(val.bz, "bz");
-        proc(val.obz, "obz");
-        proc(val.i_arr, "i_arr");
+        //proc(val.obz, "obz");
+        //proc(val.i_arr, "i_arr");
     }
 };
 
@@ -154,7 +154,7 @@ int amain(int argc, char **argv)
     b.of = 3.14f;
     b.ostr = "HAAA";
 
-    b.obz = baz();
+    //b.obz = baz();
 
     bar b2;
 
@@ -202,6 +202,7 @@ void generate()
     append_struct_fields<vec2d_t>(fields_map);
 
     generate_java_structs(fields_map, "../src");
+
 }
 
 void interop()
@@ -214,7 +215,7 @@ void interop()
     b.of = 3.14f;
     b.ostr = "HAAA";
 
-    b.obz = baz();
+    //b.obz = baz();
 
     bar b2;
 

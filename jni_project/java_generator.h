@@ -42,40 +42,49 @@ namespace jvm_interop
             process_type<T>();
         }
         
+    private:
         template<typename T>
-        void operator()(optional<T> const &opt_field, char const *name)
+        void process_type(optional<T> const &)
         {
-            append_field(opt_field, name);
             process_type<T>();
         }
 
-    private:
         template<typename T>
         void process_type(enable_if_primitive_t<T> * = nullptr) const
         {
         }
+
 
         template<typename T>
         void process_type(enable_if_not_primitive_t<T> * = nullptr) const
         {
             process_struct_type<T>();
         }
+    
+    private:
+        template<typename T>
+        void process_struct_type(std::enable_if_t<is_array<T>::value> * = nullptr) const
+        {
+            process_type<T::value_type>();
+        }
 
         template<typename T>
-        void process_struct_type(std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
+        void process_struct_type(std::enable_if_t<!is_array<T>::value> * = nullptr) const
+        {
+            process_non_array_type<T>();
+        }
+
+    private:
+        template<typename T>
+        void process_non_array_type(std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
         {
         }
 
         template<typename T>
-        void process_struct_type(std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
+        void process_non_array_type(std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
         {
-            auto desc = get_generated_type_desc<T>();
-
-            string const &java_name = desc->java_name();
-            if (dst_.count(java_name) == 0)
-                append_struct_fields<T>(dst_);
+            append_struct_fields<T>(dst_);
         }
-
 
 
     private:
@@ -96,6 +105,9 @@ namespace jvm_interop
     void append_struct_fields(struct_fields_map_t &dst)
     {
         auto desc = get_generated_type_desc<T>();
+        string const &java_name = desc->java_name();
+        if (dst.count(java_name) != 0)
+            return;
 
         append_struct_fields_processor proc(desc, dst);
 
