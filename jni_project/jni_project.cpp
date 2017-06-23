@@ -246,6 +246,12 @@ void interop()
 
         auto res2 = sm2({ 1, 29, 344, -3, 0, 7 });
 
+
+        jclass fucker_jclass = find_class("org/jnijvm/Fucker");
+        auto sm3 = get_static_method<bar, bar>(fucker_jclass, "fuckBar");
+
+        auto res3 = sm3(bar());
+
         int aaa = 5;
 
     }

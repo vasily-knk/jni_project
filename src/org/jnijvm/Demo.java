@@ -2,6 +2,7 @@ package org.jnijvm;
 
 import org.vasya.Bar;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 
@@ -31,7 +32,7 @@ public class Demo {
             }
         }
 
-        return arrs.toArray(new String[0]);
+        return arrs.toArray(new String[arrs.size()]);
     }
 
     public static int[] printInts(int[] ints) {
@@ -50,5 +51,7 @@ public class Demo {
     {
         Bar b = new Bar();
         modifyBar(b);
+
+        String s = Fucker.class.getMethods()[0].toGenericString();
     }
 }

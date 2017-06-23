@@ -630,6 +630,13 @@ namespace detail
     template<typename T>
     void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<is_array<T>::value> * = nullptr)
     {
+        if (!src)
+        {
+            std::stringstream ss;
+            ss << "Trying to convert null '" << get_type_desc<T>()->java_name() << "' to non-optional cpp array";
+            throw jvm_interop_error(ss.str());
+        }
+
         jvm2cpp_array(src, dst);
     }
 
