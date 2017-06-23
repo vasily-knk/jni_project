@@ -39,49 +39,46 @@ namespace jvm_interop
         void operator()(T const &field, char const *name) const
         {
             append_field(field, name);
-            process_type<T>();
+
+            T const *fake_ptr = nullptr;
+            process_type(fake_ptr);
         }
         
     private:
         template<typename T>
-        void process_type(optional<T> const &)
+        void process_type(optional<T> const *)
         {
-            process_type<T>();
+            T const* fake_ptr = nullptr;
+            process_type(fake_ptr);
         }
 
         template<typename T>
-        void process_type(enable_if_primitive_t<T> * = nullptr) const
+        void process_type(vector<T> const *)
+        {
+            T const* fake_ptr = nullptr;
+            process_type(fake_ptr);
+        }
+
+        template<typename T>
+        void process_type(T const *, enable_if_primitive_t<T> * = nullptr) const
         {
         }
 
 
         template<typename T>
-        void process_type(enable_if_not_primitive_t<T> * = nullptr) const
+        void process_type(T const *fake_ptr, enable_if_not_primitive_t<T> * = nullptr) const
         {
-            process_not_primitive_type<T>();
-        }
-    
-    private:
-        template<typename T>
-        void process_not_primitive_type(std::enable_if_t<is_array<T>::value> * = nullptr) const
-        {
-            process_type<T::value_type>();
-        }
-
-        template<typename T>
-        void process_not_primitive_type(std::enable_if_t<!is_array<T>::value> * = nullptr) const
-        {
-            process_non_array_type<T>();
+            process_not_primitive_type(fake_ptr);
         }
 
     private:
         template<typename T>
-        void process_non_array_type(std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
+        void process_not_primitive_type(T const *, std::enable_if_t<!jvm_type_traits<T>::needs_generation> * = nullptr) const
         {
         }
 
         template<typename T>
-        void process_non_array_type(std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
+        void process_not_primitive_type(T const *, std::enable_if_t<jvm_type_traits<T>::needs_generation> * = nullptr) const
         {
             append_struct_fields<T>(dst_);
         }

@@ -274,22 +274,11 @@ struct jvm_type_traits<optional<T>, enable_if_not_primitive_t<T>>
 };
 
 
-// array
 
 template<typename T>
-struct is_array
-    : std::integral_constant<bool, false>
-{};
-
-template<typename T>
-struct is_array<vector<T>>
-    : std::integral_constant<bool, true>
-{};
-
-template<typename Arr>
-struct jvm_type_traits<Arr, std::enable_if_t<is_array<Arr>::value>>
+struct jvm_type_traits<vector<T>>
 {
-    typedef typename Arr::value_type value_type;
+    typedef T value_type;
 
     typedef jobject_ptr jvm_type;
     typedef jobject unwrapped_jvm_type;
@@ -446,13 +435,13 @@ namespace detail
 
     
 template<typename T>
-T cpp2jvm(T src, std::enable_if_t<!is_array<T>::value && jvm_type_traits<T>::is_primitive> * = nullptr)
+T cpp2jvm(T src, std::enable_if_t<jvm_type_traits<T>::is_primitive> * = nullptr)
 {
 	return src;
 }
 
 template<typename T>
-jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!is_array<T>::value && !jvm_type_traits<T>::is_primitive> * = nullptr)
+jobject_ptr cpp2jvm(T const &src, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
 {
     struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
@@ -527,7 +516,7 @@ jobject_ptr cpp2jvm_array(T const &src, enable_if_not_primitive_t<typename T::va
 }
 
 template<typename T>
-jobject_ptr cpp2jvm(T const &src, std::enable_if_t<is_array<T>::value> * = nullptr)
+jobject_ptr cpp2jvm(vector<T> const &src)
 {
     return cpp2jvm_array(src);
 }
@@ -551,7 +540,7 @@ namespace detail
 	}
 
     template<typename T>
-    void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<!is_array<T>::value && !jvm_type_traits<T>::is_primitive> * = nullptr)
+    void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<!jvm_type_traits<T>::is_primitive> * = nullptr)
 	{
         struct_runtime_type_desc_ptr runtime_desc = get_type_desc<T>();
 
@@ -628,7 +617,7 @@ namespace detail
     }
 
     template<typename T>
-    void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<is_array<T>::value> * = nullptr)
+    void jvm2cpp_impl(jobject_ptr src, vector<T> &dst)
     {
         if (!src)
         {
