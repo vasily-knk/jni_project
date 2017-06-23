@@ -406,6 +406,7 @@ namespace detail
         using array_type = type ## Array;                                       \
         using array_creator_fn = array_type(JNIEnv::*)(jsize);                  \
         using region_setter_fn = void(JNIEnv::*)(array_type, jsize, jsize, ret_type const *); \
+        using region_getter_fn = void(JNIEnv::*)(array_type, jsize, jsize, ret_type *); \
                                                                                 \
         static array_creator_fn get_array_creator()                             \
         {                                                                       \
@@ -415,6 +416,11 @@ namespace detail
         static region_setter_fn get_region_setter()                             \
         {                                                                       \
             return &JNIEnv::Set ## Type ## ArrayRegion;                         \
+        }                                                                       \
+                                                                                \
+        static region_getter_fn get_region_getter()                             \
+        {                                                                       \
+            return &JNIEnv::Get ## Type ## ArrayRegion;                         \
         }                                                                       \
     };
 
@@ -588,8 +594,44 @@ namespace detail
     }
 
     template<typename Arr>
-    void jvm2cpp_impl(jobject_ptr src, Arr &dst, std::enable_if_t<is_array<Arr>::value> * = nullptr)
-    {}
+    void jvm2cpp_array(jobject_ptr src, Arr &dst, enable_if_primitive_t<typename Arr::value_type> * = nullptr)
+    {
+        typedef typename Arr::value_type value_type;
+
+        typedef typename detail::jni_array_creator_traits<value_type>::array_type array_type;
+        
+        auto src_arr = reinterpret_cast<array_type>(unwrap(src));
+        auto env = env_instance();
+        jsize len = env->GetArrayLength(src_arr);
+        dst.resize(len);
+
+        auto region_getter = detail::jni_array_creator_traits<value_type>::get_region_getter();
+
+        std::invoke(region_getter, env, src_arr, 0, len, dst.data());
+    }
+
+    template<typename Arr>
+    void jvm2cpp_array(jobject_ptr src, Arr &dst, enable_if_not_primitive_t<typename Arr::value_type> * = nullptr)
+    {
+        typedef typename Arr::value_type value_type;
+
+        auto src_arr = reinterpret_cast<jobjectArray>(unwrap(src));
+        auto env = env_instance();
+        jsize len = env->GetArrayLength(src_arr);
+        dst.resize(len);
+
+        for (jsize i = 0; i < len; ++i)
+        {
+            auto src_elem = wrap(env->GetObjectArrayElement(src_arr, i));
+            dst.at(i) = jvm2cpp<value_type>(src_elem);
+        }
+    }
+
+    template<typename T>
+    void jvm2cpp_impl(jobject_ptr src, T &dst, std::enable_if_t<is_array<T>::value> * = nullptr)
+    {
+        jvm2cpp_array(src, dst);
+    }
 
     void jvm2cpp_impl(jobject_ptr src, string &dst);
 } // namespace detail

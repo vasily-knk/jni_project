@@ -2,6 +2,7 @@ package org.jnijvm;
 
 import org.vasya.Bar;
 
+import java.util.ArrayList;
 
 
 public class Demo {
@@ -19,18 +20,28 @@ public class Demo {
         return Fucker.fuckBar(src);
     }
 
-    public static void printStrings(String[][] strss) {
+    public static String[] printStrings(String[][] strss) {
+        ArrayList<String> arrs = new ArrayList<>();
         for (String[] strs : strss) {
             System.out.println();
             System.out.println("-- Pack:");
-            for (String str : strs)
+            for (String str : strs) {
                 System.out.println(str);
+                arrs.add(str);
+            }
         }
+
+        return arrs.toArray(new String[0]);
     }
 
-    public static void printInts(int[] ints) {
-        for (int i : ints)
-            System.out.println("Int: " + i);
+    public static int[] printInts(int[] ints) {
+        int[] result = new int[ints.length];
+        for (int i = 0; i < ints.length; ++i) {
+            System.out.println("Int: " + ints[i]);
+            result[i] = ints[i] * 10;
+        }
+
+        return result;
     }
 
 
